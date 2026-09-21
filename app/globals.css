@@ -1,0 +1,84 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-white text-ink-900 antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font-family: inherit;
+  }
+
+  /* Tabular numbers everywhere numeric P/L is shown */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Focus ring — visible but restrained */
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500/40 ring-offset-1 ring-offset-white;
+  }
+}
+
+@layer components {
+  /* Section titles in the sidebar */
+  .sidebar-section-title {
+    @apply px-3 pt-6 pb-2 text-3xs font-semibold uppercase tracking-wider text-white/60;
+  }
+
+  /* Number display — use with .tabular */
+  .metric {
+    @apply text-2xl font-semibold tracking-tight tabular;
+  }
+
+  .metric-sm {
+    @apply text-lg font-semibold tracking-tight tabular;
+  }
+
+  /* Small caps labels above metrics */
+  .eyebrow {
+    @apply text-2xs font-medium uppercase tracking-wide text-ink-500;
+  }
+}
+
+@layer utilities {
+  /* Hide number input spinners — cleaner for financial inputs */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+
+  /* Date/time inputs — normalize icon color */
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    opacity: 0.5;
+    cursor: pointer;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator:hover,
+  input[type="time"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 0.8;
+  }
+}
