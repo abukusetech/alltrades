@@ -11,15 +11,10 @@ import {
 import { validateScreenshotFile } from "@/lib/data/screenshots";
 
 export interface UploadedScreenshot {
-  /** Local preview object URL or remote signed URL. */
   url: string;
-  /** Storage path (when saved to Supabase) — null until saved. */
   storagePath?: string | null;
-  /** The original File object when it's a pending upload. */
   file?: File | null;
-  /** Row id, when this screenshot was already saved. */
   id?: string | null;
-  /** Whether this URL was revocable (pending uploads). */
   revocable?: boolean;
 }
 
@@ -43,18 +38,25 @@ export function ScreenshotUploader({
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const blobUrlsRef = React.useRef<Set<string>>(new Set());
 
-  // Revoke preview URLs on unmount
   React.useEffect(() => {
+    const urls = blobUrlsRef.current;
     return () => {
-      value.forEach((s) => {
-        if (s.revocable && s.url.startsWith("blob:")) {
-          URL.revokeObjectURL(s.url);
+      urls.forEach((u) => {
+        try {
+          URL.revokeObjectURL(u);
+        } catch {
+          // ignore
         }
       });
+      urls.clear();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function trackBlob(url: string) {
+    if (url.startsWith("blob:")) blobUrlsRef.current.add(url);
+  }
 
   function onPick() {
     inputRef.current?.click();
@@ -78,8 +80,10 @@ export function ScreenshotUploader({
         setError(invalid);
         continue;
       }
+      const url = URL.createObjectURL(f);
+      trackBlob(url);
       accepted.push({
-        url: URL.createObjectURL(f),
+        url,
         file: f,
         storagePath: null,
         id: null,
@@ -93,10 +97,7 @@ export function ScreenshotUploader({
 
   function removeAt(idx: number) {
     const next = [...value];
-    const [removed] = next.splice(idx, 1);
-    if (removed && removed.revocable && removed.url.startsWith("blob:")) {
-      URL.revokeObjectURL(removed.url);
-    }
+    next.splice(idx, 1);
     onChange(next);
   }
 

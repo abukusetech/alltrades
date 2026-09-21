@@ -25,6 +25,15 @@ export function useCurrentAccount() {
   return ctx;
 }
 
+function readStoredAccountId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(SELECTED_ACCOUNT_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export function AppShell({
   profile,
   accounts,
@@ -37,28 +46,42 @@ export function AppShell({
   const router = useRouter();
   const supabase = React.useMemo(() => createClient(), []);
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+
+  // Initialize SYNCHRONOUSLY from localStorage so the first render already
+  // has the right account — no wasted SWR fetch of null.
   const [currentAccountId, setCurrentAccountIdState] = React.useState<
     string | null
-  >(null);
+  >(() => {
+    const stored = readStoredAccountId();
+    if (stored && accounts.some((a) => a.id === stored)) return stored;
+    return accounts[0]?.id ?? null;
+  });
 
+  // If the initially-chosen account isn't valid anymore, reconcile once.
   React.useEffect(() => {
-    const stored = window.localStorage.getItem(SELECTED_ACCOUNT_KEY);
-    const storedValid = stored && accounts.some((a) => a.id === stored);
-    if (storedValid) {
-      setCurrentAccountIdState(stored);
-    } else if (accounts[0]) {
-      setCurrentAccountIdState(accounts[0].id);
-      window.localStorage.setItem(SELECTED_ACCOUNT_KEY, accounts[0].id);
-    } else {
-      setCurrentAccountIdState(null);
+    if (currentAccountId && accounts.some((a) => a.id === currentAccountId)) {
+      return;
     }
-  }, [accounts]);
+    const fallback = accounts[0]?.id ?? null;
+    if (fallback !== currentAccountId) {
+      setCurrentAccountIdState(fallback);
+      if (fallback) {
+        try {
+          window.localStorage.setItem(SELECTED_ACCOUNT_KEY, fallback);
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, [accounts, currentAccountId]);
 
-  // Account switching is a pure client-state change. Pages re-render from SWR
-  // data keyed by accountId — no server round-trip required.
   const setCurrentAccountId = React.useCallback((id: string) => {
     setCurrentAccountIdState(id);
-    window.localStorage.setItem(SELECTED_ACCOUNT_KEY, id);
+    try {
+      window.localStorage.setItem(SELECTED_ACCOUNT_KEY, id);
+    } catch {
+      // ignore
+    }
   }, []);
 
   const currentAccount = React.useMemo(

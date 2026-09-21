@@ -7,6 +7,7 @@ import { useCurrentAccount } from "@/components/layout/AppShell";
 import { AccountForm } from "./AccountForm";
 import { AccountList } from "./AccountList";
 import { SystemRulesCard } from "./SystemRulesCard";
+import { DeleteAccountCard } from "./DeleteAccountCard";
 
 export function SettingsClient() {
   const { accounts, currentAccount } = useCurrentAccount();
@@ -34,13 +35,16 @@ export function SettingsClient() {
             <CardHeader>
               <CardTitle>Your Accounts</CardTitle>
               <span className="text-2xs text-ink-500">
-                {accounts.length} {accounts.length === 1 ? "account" : "accounts"}
+                {accounts.length}{" "}
+                {accounts.length === 1 ? "account" : "accounts"}
               </span>
             </CardHeader>
             <CardBody>
               <AccountList accounts={accounts} />
             </CardBody>
           </Card>
+
+          <DeleteAccountCard />
         </div>
 
         <div className="space-y-6">
@@ -52,11 +56,11 @@ export function SettingsClient() {
             </CardHeader>
             <CardBody>
               <p className="text-2xs leading-relaxed text-ink-600">
-                Market conditions apply, including spread and slippage. ALLTRADES
-                does not control or represent broker execution conditions and
-                does not connect to any broker account. Every metric shown in
-                the application is derived from the trades, analyses and
-                withdrawals you record here.
+                Market conditions apply, including spread and slippage.
+                ALLTRADES does not control or represent broker execution
+                conditions and does not connect to any broker account. Every
+                metric shown in the application is derived from the trades,
+                analyses and withdrawals you record here.
               </p>
             </CardBody>
           </Card>

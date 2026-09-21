@@ -50,7 +50,6 @@ export function Sidebar({ open, onClose, onSignOut, userEmail }: SidebarProps) {
 
   return (
     <>
-      {/* Mobile overlay */}
       {open && (
         <div
           className="fixed inset-0 z-30 bg-ink-950/40 lg:hidden"
@@ -66,10 +65,10 @@ export function Sidebar({ open, onClose, onSignOut, userEmail }: SidebarProps) {
         )}
         aria-label="Primary navigation"
       >
-        {/* Brand */}
         <div className="flex items-center justify-between px-4 py-4">
           <Link
             href="/dashboard"
+            prefetch
             className="flex items-center gap-2.5 text-white"
             onClick={onClose}
           >
@@ -88,16 +87,27 @@ export function Sidebar({ open, onClose, onSignOut, userEmail }: SidebarProps) {
           </button>
         </div>
 
-        {/* Nav */}
         <nav className="flex-1 overflow-y-auto pb-4">
-          <SidebarSection title="Workspace" items={WORKSPACE} pathname={pathname} onNavigate={onClose} />
-          <SidebarSection title="Account" items={ACCOUNT} pathname={pathname} onNavigate={onClose} />
+          <SidebarSection
+            title="Workspace"
+            items={WORKSPACE}
+            pathname={pathname}
+            onNavigate={onClose}
+          />
+          <SidebarSection
+            title="Account"
+            items={ACCOUNT}
+            pathname={pathname}
+            onNavigate={onClose}
+          />
         </nav>
 
-        {/* Footer */}
         <div className="border-t border-white/10 p-3">
           {userEmail && (
-            <div className="mb-2 truncate px-2 text-3xs text-white/60" title={userEmail}>
+            <div
+              className="mb-2 truncate px-2 text-3xs text-white/60"
+              title={userEmail}
+            >
               {userEmail}
             </div>
           )}
@@ -138,6 +148,7 @@ function SidebarSection({
             <li key={item.href}>
               <Link
                 href={item.href}
+                prefetch={true}
                 onClick={onNavigate}
                 className={cn(
                   "flex items-center gap-2.5 rounded px-3 py-2 text-sm transition-colors",
@@ -157,10 +168,6 @@ function SidebarSection({
   );
 }
 
-/**
- * ALLTRADES mark — the "A" with a rising arrow.
- * Simple inline SVG so it inherits currentColor and needs no external file.
- */
 export function AlltradesMark({ className }: { className?: string }) {
   return (
     <svg

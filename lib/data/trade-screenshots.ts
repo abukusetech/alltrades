@@ -10,7 +10,11 @@ export async function listTradeScreenshots(
     .select("*")
     .eq("trade_id", tradeId)
     .order("created_at", { ascending: true });
-  if (error) throw error;
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error("[ALLTRADES] listTradeScreenshots failed", error);
+    throw error;
+  }
   return (data ?? []) as TradeScreenshot[];
 }
 

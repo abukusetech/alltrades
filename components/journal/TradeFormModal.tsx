@@ -8,7 +8,10 @@ import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
-import { ScreenshotUploader, type UploadedScreenshot } from "@/components/ui/ScreenshotUploader";
+import {
+  ScreenshotUploader,
+  type UploadedScreenshot,
+} from "@/components/ui/ScreenshotUploader";
 import { useToast } from "@/components/ui/Toast";
 import { createTrade, updateTrade } from "@/lib/data/trades";
 import {
@@ -16,7 +19,11 @@ import {
   listTradeScreenshots,
   removeTradeScreenshot,
 } from "@/lib/data/trade-screenshots";
-import { getSignedUrl, uploadScreenshot } from "@/lib/data/screenshots";
+import {
+  getSignedUrl,
+  uploadScreenshot,
+  deleteScreenshot,
+} from "@/lib/data/screenshots";
 import {
   INSTRUMENTS,
   DIRECTIONS,
@@ -131,15 +138,15 @@ export function TradeFormModal({
   const [screenshots, setScreenshots] = React.useState<UploadedScreenshot[]>([]);
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [saving, setSaving] = React.useState(false);
+  const [uploadStatus, setUploadStatus] = React.useState<string | null>(null);
 
-  // Reset when modal opens
   React.useEffect(() => {
     if (!open) return;
     setForm(initialState(editing));
     setErrors({});
     setScreenshots([]);
+    setUploadStatus(null);
     if (editing) {
-      // load existing screenshots
       (async () => {
         try {
           const rows = await listTradeScreenshots(supabase, editing.id);
@@ -162,7 +169,6 @@ export function TradeFormModal({
     }
   }, [open, editing, supabase]);
 
-  // Weekly limit check — only enforced when creating new trades.
   const weeklyLimitReached =
     !isEdit && weeklyTradeCount >= account.max_weekly_trades;
 
@@ -176,14 +182,14 @@ export function TradeFormModal({
     if (!form.instrument) next.instrument = "Instrument is required.";
     if (!form.direction) next.direction = "Direction is required.";
     if (!form.result) next.result = "Result is required.";
-
     const pl = parseNumberOrNull(form.profit_loss);
     if (pl === null) next.profit_loss = "Profit / Loss is required.";
-
-    if (form.lot_size && (Number(form.lot_size) < 0 || !Number.isFinite(Number(form.lot_size)))) {
+    if (
+      form.lot_size &&
+      (Number(form.lot_size) < 0 || !Number.isFinite(Number(form.lot_size)))
+    ) {
       next.lot_size = "Lot size cannot be negative.";
     }
-
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -252,15 +258,29 @@ export function TradeFormModal({
         savedTrade = await createTrade(supabase, user.id, payload);
       }
 
-      // Upload any pending screenshots
-      for (const s of screenshots) {
-        if (s.file && !s.storagePath) {
-          try {
+      const pending = screenshots.filter((s) => s.file && !s.storagePath);
+      if (pending.length > 0) {
+        setUploadStatus(
+          `Uploading ${pending.length} image${pending.length > 1 ? "s" : ""}…`
+        );
+
+        // eslint-disable-next-line no-console
+        console.log("[ALLTRADES] upload attempt", {
+          userId: user.id,
+          tradeId: savedTrade.id,
+          count: pending.length,
+          fileNames: pending.map((s) => s.file?.name),
+          fileSizes: pending.map((s) => s.file?.size),
+          fileTypes: pending.map((s) => s.file?.type),
+        });
+
+        const results = await Promise.allSettled(
+          pending.map(async (s) => {
             const { path } = await uploadScreenshot(
               supabase,
               user.id,
               `trades/${savedTrade.id}`,
-              s.file
+              s.file as File
             );
             await addTradeScreenshot(
               supabase,
@@ -269,24 +289,44 @@ export function TradeFormModal({
               path,
               "Analysis"
             );
-          } catch (err) {
-            // Non-fatal — user still gets the trade saved
-            console.warn("Screenshot upload failed", err);
-          }
+          })
+        );
+
+        // eslint-disable-next-line no-console
+        console.log("[ALLTRADES] upload results", results);
+
+        const failures = results.filter(
+          (r): r is PromiseRejectedResult => r.status === "rejected"
+        );
+        if (failures.length > 0) {
+          const first = failures[0]?.reason;
+          const detail =
+            first instanceof Error
+              ? first.message
+              : typeof first === "string"
+                ? first
+                : JSON.stringify(first);
+          // eslint-disable-next-line no-console
+          console.error("[ALLTRADES] upload failures", failures);
+          toast.warning(
+            `${failures.length} screenshot${failures.length > 1 ? "s" : ""} failed to upload`,
+            detail
+          );
         }
       }
 
-      // Delete removed existing screenshots
       if (isEdit && editing) {
         const existing = await listTradeScreenshots(supabase, editing.id);
         const keptIds = new Set(
           screenshots.filter((s) => s.id).map((s) => s.id as string)
         );
-        for (const r of existing) {
-          if (!keptIds.has(r.id)) {
-            await removeTradeScreenshot(supabase, r.id);
-          }
-        }
+        const toRemove = existing.filter((r) => !keptIds.has(r.id));
+        Promise.all(
+          toRemove.map(async (r) => {
+            await deleteScreenshot(supabase, r.storage_path).catch(() => {});
+            await removeTradeScreenshot(supabase, r.id).catch(() => {});
+          })
+        );
       }
 
       toast.success(
@@ -301,16 +341,15 @@ export function TradeFormModal({
       toast.error("Could not save trade", message);
     } finally {
       setSaving(false);
+      setUploadStatus(null);
     }
   }
-
-  const title = isEdit ? "Edit Trade" : "New Trade";
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={title}
+      title={isEdit ? "Edit Trade" : "New Trade"}
       description="Record the complete setup, execution and psychology."
       size="xl"
       footer={
@@ -331,330 +370,189 @@ export function TradeFormModal({
         </div>
       )}
 
+      {uploadStatus && (
+        <div className="mb-4 rounded border border-brand-200 bg-brand-50 px-3 py-2 text-2xs text-brand-700">
+          {uploadStatus} Images are compressed automatically before upload.
+        </div>
+      )}
+
       <form onSubmit={onSubmit} className="space-y-6" noValidate>
-        {/* Trade information */}
         <Section title="Trade Information">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Field label="Date" htmlFor="trade_date" required error={errors.trade_date}>
-              <Input
-                id="trade_date"
-                type="date"
-                value={form.trade_date}
+              <Input id="trade_date" type="date" value={form.trade_date}
                 onChange={(e) => set("trade_date", e.target.value)}
-                invalid={!!errors.trade_date}
-              />
+                invalid={!!errors.trade_date} />
             </Field>
             <Field label="Time" htmlFor="trade_time">
-              <Input
-                id="trade_time"
-                type="time"
-                value={form.trade_time}
-                onChange={(e) => set("trade_time", e.target.value)}
-              />
+              <Input id="trade_time" type="time" value={form.trade_time}
+                onChange={(e) => set("trade_time", e.target.value)} />
             </Field>
             <Field label="Instrument" htmlFor="instrument" required error={errors.instrument}>
-              <Select
-                id="instrument"
-                value={form.instrument}
+              <Select id="instrument" value={form.instrument}
                 onChange={(e) => set("instrument", e.target.value)}
                 options={INSTRUMENTS as unknown as string[]}
-                placeholder="Select instrument"
-                invalid={!!errors.instrument}
-              />
+                placeholder="Select instrument" invalid={!!errors.instrument} />
             </Field>
             <Field label="Direction" htmlFor="direction" required error={errors.direction}>
-              <Select
-                id="direction"
-                value={form.direction}
+              <Select id="direction" value={form.direction}
                 onChange={(e) => set("direction", e.target.value)}
                 options={DIRECTIONS as unknown as string[]}
-                placeholder="Select direction"
-                invalid={!!errors.direction}
-              />
+                placeholder="Select direction" invalid={!!errors.direction} />
             </Field>
             <Field label="Lot Size" htmlFor="lot_size" error={errors.lot_size}>
-              <Input
-                id="lot_size"
-                type="number"
-                step="0.0001"
-                min="0"
-                value={form.lot_size}
-                onChange={(e) => set("lot_size", e.target.value)}
-                placeholder="0.10"
-              />
+              <Input id="lot_size" type="number" step="0.0001" min="0"
+                value={form.lot_size} onChange={(e) => set("lot_size", e.target.value)}
+                placeholder="0.10" />
             </Field>
             <Field label="Entry Price" htmlFor="entry_price">
-              <Input
-                id="entry_price"
-                type="number"
-                step="any"
-                value={form.entry_price}
-                onChange={(e) => set("entry_price", e.target.value)}
-                placeholder="1.0900"
-              />
+              <Input id="entry_price" type="number" step="any"
+                value={form.entry_price} onChange={(e) => set("entry_price", e.target.value)}
+                placeholder="1.0900" />
             </Field>
             <Field label="Exit Price" htmlFor="exit_price">
-              <Input
-                id="exit_price"
-                type="number"
-                step="any"
-                value={form.exit_price}
-                onChange={(e) => set("exit_price", e.target.value)}
-                placeholder="1.0930"
-              />
+              <Input id="exit_price" type="number" step="any"
+                value={form.exit_price} onChange={(e) => set("exit_price", e.target.value)}
+                placeholder="1.0930" />
             </Field>
             <Field label="Stop Loss" htmlFor="stop_loss">
-              <Input
-                id="stop_loss"
-                type="number"
-                step="any"
-                value={form.stop_loss}
-                onChange={(e) => set("stop_loss", e.target.value)}
-              />
+              <Input id="stop_loss" type="number" step="any"
+                value={form.stop_loss} onChange={(e) => set("stop_loss", e.target.value)} />
             </Field>
             <Field label="Take Profit" htmlFor="take_profit">
-              <Input
-                id="take_profit"
-                type="number"
-                step="any"
-                value={form.take_profit}
-                onChange={(e) => set("take_profit", e.target.value)}
-              />
+              <Input id="take_profit" type="number" step="any"
+                value={form.take_profit} onChange={(e) => set("take_profit", e.target.value)} />
             </Field>
             <Field label="Risk Amount" htmlFor="risk_amount">
-              <Input
-                id="risk_amount"
-                type="number"
-                step="0.01"
-                value={form.risk_amount}
-                onChange={(e) => set("risk_amount", e.target.value)}
-                prefix="$"
-              />
+              <Input id="risk_amount" type="number" step="0.01"
+                value={form.risk_amount} onChange={(e) => set("risk_amount", e.target.value)}
+                prefix="$" />
             </Field>
-            <Field
-              label="Profit / Loss"
-              htmlFor="profit_loss"
-              required
+            <Field label="Profit / Loss" htmlFor="profit_loss" required
               error={errors.profit_loss}
-              hint="Negative for losses. E.g. -85.00"
-            >
-              <Input
-                id="profit_loss"
-                type="number"
-                step="0.01"
-                value={form.profit_loss}
-                onChange={(e) => set("profit_loss", e.target.value)}
-                invalid={!!errors.profit_loss}
-                prefix="$"
-              />
+              hint="Negative for losses. E.g. -85.00">
+              <Input id="profit_loss" type="number" step="0.01"
+                value={form.profit_loss} onChange={(e) => set("profit_loss", e.target.value)}
+                invalid={!!errors.profit_loss} prefix="$" />
             </Field>
             <Field label="Risk : Reward" htmlFor="risk_reward">
-              <Select
-                id="risk_reward"
-                value={form.risk_reward}
+              <Select id="risk_reward" value={form.risk_reward}
                 onChange={(e) => set("risk_reward", e.target.value)}
                 options={RISK_REWARD_OPTIONS as unknown as string[]}
-                placeholder="Select R:R"
-              />
+                placeholder="Select R:R" />
             </Field>
             <Field label="Pips" htmlFor="pips">
-              <Input
-                id="pips"
-                type="number"
-                step="0.1"
-                value={form.pips}
-                onChange={(e) => set("pips", e.target.value)}
-              />
+              <Input id="pips" type="number" step="0.1"
+                value={form.pips} onChange={(e) => set("pips", e.target.value)} />
             </Field>
             <Field label="Commission" htmlFor="commission">
-              <Input
-                id="commission"
-                type="number"
-                step="0.01"
-                value={form.commission}
-                onChange={(e) => set("commission", e.target.value)}
-                prefix="$"
-              />
+              <Input id="commission" type="number" step="0.01"
+                value={form.commission} onChange={(e) => set("commission", e.target.value)}
+                prefix="$" />
             </Field>
             <Field label="Swap" htmlFor="swap">
-              <Input
-                id="swap"
-                type="number"
-                step="0.01"
-                value={form.swap}
-                onChange={(e) => set("swap", e.target.value)}
-                prefix="$"
-              />
+              <Input id="swap" type="number" step="0.01"
+                value={form.swap} onChange={(e) => set("swap", e.target.value)}
+                prefix="$" />
             </Field>
             <Field label="Spread" htmlFor="spread">
-              <Input
-                id="spread"
-                type="number"
-                step="any"
-                value={form.spread}
-                onChange={(e) => set("spread", e.target.value)}
-              />
+              <Input id="spread" type="number" step="any"
+                value={form.spread} onChange={(e) => set("spread", e.target.value)} />
             </Field>
             <Field label="Holding Time" htmlFor="holding_time" hint="e.g. 2h 15m">
-              <Input
-                id="holding_time"
-                value={form.holding_time}
+              <Input id="holding_time" value={form.holding_time}
                 onChange={(e) => set("holding_time", e.target.value)}
-                placeholder="2h 15m"
-              />
+                placeholder="2h 15m" />
             </Field>
           </div>
         </Section>
 
-        {/* Market & Setup */}
         <Section title="Market & Setup">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Field label="Strategy" htmlFor="strategy">
-              <Select
-                id="strategy"
-                value={form.strategy}
+              <Select id="strategy" value={form.strategy}
                 onChange={(e) => set("strategy", e.target.value)}
-                options={STRATEGIES as unknown as string[]}
-                placeholder="Select strategy"
-              />
+                options={STRATEGIES as unknown as string[]} placeholder="Select strategy" />
             </Field>
             <Field label="Setup Type" htmlFor="setup_type">
-              <Select
-                id="setup_type"
-                value={form.setup_type}
+              <Select id="setup_type" value={form.setup_type}
                 onChange={(e) => set("setup_type", e.target.value)}
-                options={SETUP_TYPES as unknown as string[]}
-                placeholder="Select setup"
-              />
+                options={SETUP_TYPES as unknown as string[]} placeholder="Select setup" />
             </Field>
             <Field label="Timeframe" htmlFor="timeframe">
-              <Select
-                id="timeframe"
-                value={form.timeframe}
+              <Select id="timeframe" value={form.timeframe}
                 onChange={(e) => set("timeframe", e.target.value)}
-                options={TIMEFRAMES as unknown as string[]}
-                placeholder="Select timeframe"
-              />
+                options={TIMEFRAMES as unknown as string[]} placeholder="Select timeframe" />
             </Field>
             <Field label="Session" htmlFor="session">
-              <Select
-                id="session"
-                value={form.session}
+              <Select id="session" value={form.session}
                 onChange={(e) => set("session", e.target.value)}
-                options={SESSIONS as unknown as string[]}
-                placeholder="Select session"
-              />
+                options={SESSIONS as unknown as string[]} placeholder="Select session" />
             </Field>
             <Field label="Market Bias" htmlFor="market_bias">
-              <Select
-                id="market_bias"
-                value={form.market_bias}
+              <Select id="market_bias" value={form.market_bias}
                 onChange={(e) => set("market_bias", e.target.value)}
-                options={MARKET_BIAS_OPTIONS as unknown as string[]}
-                placeholder="Select bias"
-              />
+                options={MARKET_BIAS_OPTIONS as unknown as string[]} placeholder="Select bias" />
             </Field>
             <Field label="Entry Model" htmlFor="entry_model">
-              <Select
-                id="entry_model"
-                value={form.entry_model}
+              <Select id="entry_model" value={form.entry_model}
                 onChange={(e) => set("entry_model", e.target.value)}
-                options={ENTRY_MODELS as unknown as string[]}
-                placeholder="Select entry model"
-              />
+                options={ENTRY_MODELS as unknown as string[]} placeholder="Select entry model" />
             </Field>
             <Field label="Liquidity Taken" htmlFor="liquidity_taken">
-              <Select
-                id="liquidity_taken"
-                value={form.liquidity_taken}
+              <Select id="liquidity_taken" value={form.liquidity_taken}
                 onChange={(e) => set("liquidity_taken", e.target.value)}
-                options={LIQUIDITY_TAKEN_OPTIONS as unknown as string[]}
-                placeholder="Select liquidity"
-              />
+                options={LIQUIDITY_TAKEN_OPTIONS as unknown as string[]} placeholder="Select liquidity" />
             </Field>
             <Field label="News / Event" htmlFor="news_event">
-              <Select
-                id="news_event"
-                value={form.news_event}
+              <Select id="news_event" value={form.news_event}
                 onChange={(e) => set("news_event", e.target.value)}
-                options={NEWS_EVENTS as unknown as string[]}
-                placeholder="Select news event"
-              />
+                options={NEWS_EVENTS as unknown as string[]} placeholder="Select news event" />
             </Field>
           </div>
         </Section>
 
-        {/* Execution & Psychology */}
         <Section title="Execution & Psychology">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Entry Reason" htmlFor="entry_reason">
-              <Textarea
-                id="entry_reason"
-                rows={2}
-                value={form.entry_reason}
-                onChange={(e) => set("entry_reason", e.target.value)}
-              />
+              <Textarea id="entry_reason" rows={2} value={form.entry_reason}
+                onChange={(e) => set("entry_reason", e.target.value)} />
             </Field>
             <Field label="Exit Reason" htmlFor="exit_reason">
-              <Textarea
-                id="exit_reason"
-                rows={2}
-                value={form.exit_reason}
-                onChange={(e) => set("exit_reason", e.target.value)}
-              />
+              <Textarea id="exit_reason" rows={2} value={form.exit_reason}
+                onChange={(e) => set("exit_reason", e.target.value)} />
             </Field>
             <Field label="Management" htmlFor="management">
-              <Textarea
-                id="management"
-                rows={2}
-                value={form.management}
-                onChange={(e) => set("management", e.target.value)}
-              />
+              <Textarea id="management" rows={2} value={form.management}
+                onChange={(e) => set("management", e.target.value)} />
             </Field>
             <Field label="Mistakes" htmlFor="mistakes">
-              <Textarea
-                id="mistakes"
-                rows={2}
-                value={form.mistakes}
-                onChange={(e) => set("mistakes", e.target.value)}
-              />
+              <Textarea id="mistakes" rows={2} value={form.mistakes}
+                onChange={(e) => set("mistakes", e.target.value)} />
             </Field>
             <Field label="Emotions" htmlFor="emotions">
-              <Textarea
-                id="emotions"
-                rows={2}
-                value={form.emotions}
-                onChange={(e) => set("emotions", e.target.value)}
-              />
+              <Textarea id="emotions" rows={2} value={form.emotions}
+                onChange={(e) => set("emotions", e.target.value)} />
             </Field>
             <Field label="Notes" htmlFor="notes">
-              <Textarea
-                id="notes"
-                rows={2}
-                value={form.notes}
-                onChange={(e) => set("notes", e.target.value)}
-              />
+              <Textarea id="notes" rows={2} value={form.notes}
+                onChange={(e) => set("notes", e.target.value)} />
             </Field>
             <Field label="Result" htmlFor="result" required error={errors.result}>
-              <Select
-                id="result"
-                value={form.result}
+              <Select id="result" value={form.result}
                 onChange={(e) => set("result", e.target.value)}
                 options={RESULTS as unknown as string[]}
-                placeholder="Select result"
-                invalid={!!errors.result}
-              />
+                placeholder="Select result" invalid={!!errors.result} />
             </Field>
           </div>
         </Section>
 
-        {/* Screenshots */}
         <Section title="Screenshots">
           <ScreenshotUploader
             value={screenshots}
             onChange={setScreenshots}
             label="Trade screenshots"
-            hint="Add up to 6 images: analysis, before and after the trade."
+            hint="Up to 6 images. Compressed automatically before upload."
             disabled={weeklyLimitReached}
           />
         </Section>

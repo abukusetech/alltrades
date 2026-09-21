@@ -1,11 +1,12 @@
 ﻿"use client";
 
 import * as React from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Image as ImageIcon, AlertTriangle } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Lightbox, type LightboxImage } from "@/components/ui/Lightbox";
 import { createClient } from "@/lib/supabase/client";
 import { deleteAnalysis } from "@/lib/data/analyses";
 import { listAnalysisScreenshots } from "@/lib/data/analysis-screenshots";
@@ -28,6 +29,12 @@ function outcomeTone(o: Analysis["outcome"]) {
   return "neutral" as const;
 }
 
+interface LoadedScreenshot {
+  row: AnalysisScreenshot;
+  url: string | null;
+  error: string | null;
+}
+
 export function AnalysisDetailModal({
   analysis,
   open,
@@ -37,31 +44,62 @@ export function AnalysisDetailModal({
 }: AnalysisDetailModalProps) {
   const supabase = React.useMemo(() => createClient(), []);
   const toast = useToast();
-  const [screenshots, setScreenshots] = React.useState<
-    { row: AnalysisScreenshot; url: string | null }[]
-  >([]);
+  const [screenshots, setScreenshots] = React.useState<LoadedScreenshot[]>([]);
+  const [loadingShots, setLoadingShots] = React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [lightboxIndex, setLightboxIndex] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     if (!open || !analysis) {
       setScreenshots([]);
       return;
     }
+
+    let cancelled = false;
+    setLoadingShots(true);
+
     (async () => {
       try {
         const rows = await listAnalysisScreenshots(supabase, analysis.id);
-        const withUrls = await Promise.all(
-          rows.map(async (r) => ({
-            row: r,
-            url: await getSignedUrl(supabase, r.storage_path),
-          }))
+        // eslint-disable-next-line no-console
+        console.log("[ALLTRADES] detail modal screenshot rows", rows);
+
+        const loaded: LoadedScreenshot[] = await Promise.all(
+          rows.map(async (r) => {
+            try {
+              const url = await getSignedUrl(supabase, r.storage_path);
+              return {
+                row: r,
+                url,
+                error: url ? null : "Could not generate signed URL",
+              };
+            } catch (e) {
+              return {
+                row: r,
+                url: null,
+                error: e instanceof Error ? e.message : "Signed URL error",
+              };
+            }
+          })
         );
-        setScreenshots(withUrls);
-      } catch {
-        setScreenshots([]);
+
+        // eslint-disable-next-line no-console
+        console.log("[ALLTRADES] detail modal loaded", loaded);
+
+        if (!cancelled) setScreenshots(loaded);
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error("[ALLTRADES] detail modal load failed", e);
+        if (!cancelled) setScreenshots([]);
+      } finally {
+        if (!cancelled) setLoadingShots(false);
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [open, analysis, supabase]);
 
   async function onDelete() {
@@ -82,6 +120,33 @@ export function AnalysisDetailModal({
   }
 
   if (!analysis) return null;
+
+  const lightboxImages: LightboxImage[] = screenshots
+    .filter((s) => s.url)
+    .map((s, i) => ({
+      url: s.url as string,
+      alt: `Analysis chart ${i + 1}`,
+      caption: `${analysis.instrument} · ${analysis.analysis_date} · Chart ${i + 1}`,
+      filename: `alltrades-analysis-${analysis.instrument}-${analysis.analysis_date}-${i + 1}.png`,
+    }));
+
+  async function downloadFromThumb(url: string, i: number, e: React.MouseEvent) {
+    e.stopPropagation();
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `alltrades-analysis-${analysis?.instrument}-${analysis?.analysis_date}-${i + 1}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(href);
+    } catch {
+      window.open(url, "_blank", "noopener");
+    }
+  }
 
   return (
     <>
@@ -156,35 +221,114 @@ export function AnalysisDetailModal({
           <LongForm title="Lessons" value={analysis.lessons} />
           <LongForm title="Notes" value={analysis.notes} />
 
-          {screenshots.length > 0 && (
-            <div>
+          {/* CHARTS */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
               <h3 className="text-2xs font-semibold uppercase tracking-wider text-ink-500">
-                Charts
+                Charts {screenshots.length > 0 ? `(${screenshots.length})` : ""}
               </h3>
-              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {screenshots.map(({ row, url }) =>
-                  url ? (
-                    <a
-                      key={row.id}
-                      href={url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block overflow-hidden rounded border border-border"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={url}
-                        alt="Analysis screenshot"
-                        className="h-32 w-full object-cover transition-transform hover:scale-[1.02]"
-                      />
-                    </a>
-                  ) : null
-                )}
-              </div>
+              {lightboxImages.length > 0 && (
+                <span className="text-3xs text-ink-500">
+                  Click any chart to enlarge
+                </span>
+              )}
             </div>
-          )}
+
+            {loadingShots ? (
+              <div className="rounded border border-border bg-surface-soft px-4 py-6 text-center text-2xs text-ink-500">
+                Loading charts…
+              </div>
+            ) : screenshots.length === 0 ? (
+              <div className="flex items-center gap-2 rounded border border-dashed border-border-strong bg-surface-soft px-4 py-6 text-2xs text-ink-500">
+                <ImageIcon className="h-4 w-4" />
+                No charts attached to this analysis.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {screenshots.map((s, i) => {
+                  if (!s.url) {
+                    return (
+                      <div
+                        key={s.row.id}
+                        className="flex items-start gap-2 rounded border border-warn-border bg-warn-bg px-3 py-2 text-2xs text-warn-text"
+                      >
+                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <div>
+                          <div className="font-medium">
+                            Chart {i + 1} could not be displayed
+                          </div>
+                          <div className="text-3xs opacity-80">
+                            {s.error ?? "Unknown error"}. The file exists in
+                            storage at <code>{s.row.storage_path}</code>.
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div
+                      key={s.row.id}
+                      className="overflow-hidden rounded-lg border border-border bg-surface-soft"
+                    >
+                      <div className="flex items-center justify-between border-b border-border bg-white px-3 py-2">
+                        <span className="text-2xs font-medium text-ink-700">
+                          Chart {i + 1}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setLightboxIndex(i)}
+                            className="rounded px-2 py-1 text-3xs text-ink-600 hover:bg-ink-100"
+                            title="Open full size"
+                          >
+                            View full size
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => downloadFromThumb(s.url!, i, e)}
+                            className="rounded px-2 py-1 text-3xs text-ink-600 hover:bg-ink-100"
+                            title="Download"
+                          >
+                            Download
+                          </button>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setLightboxIndex(i)}
+                        className="block w-full cursor-zoom-in"
+                        aria-label="Open chart in full size"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={s.url}
+                          alt={`Chart ${i + 1}`}
+                          className="max-h-[420px] w-full bg-ink-950/5 object-contain"
+                          loading="lazy"
+                          onError={(e) => {
+                            // eslint-disable-next-line no-console
+                            console.error("[ALLTRADES] <img> failed to load", {
+                              src: s.url,
+                              storagePath: s.row.storage_path,
+                            });
+                          }}
+                        />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </Modal>
+
+      <Lightbox
+        images={lightboxImages}
+        index={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+        onIndexChange={setLightboxIndex}
+      />
 
       <ConfirmDialog
         open={confirmDelete}

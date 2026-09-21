@@ -19,7 +19,11 @@ import {
   listAnalysisScreenshots,
   removeAnalysisScreenshot,
 } from "@/lib/data/analysis-screenshots";
-import { getSignedUrl, uploadScreenshot } from "@/lib/data/screenshots";
+import {
+  getSignedUrl,
+  uploadScreenshot,
+  deleteScreenshot,
+} from "@/lib/data/screenshots";
 import {
   INSTRUMENTS,
   TIMEFRAMES,
@@ -125,12 +129,15 @@ export function AnalysisFormModal({
   const [screenshots, setScreenshots] = React.useState<UploadedScreenshot[]>([]);
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [saving, setSaving] = React.useState(false);
+  const [uploadStatus, setUploadStatus] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!open) return;
     setForm(initialState(editing));
     setErrors({});
     setScreenshots([]);
+    setUploadStatus(null);
+
     if (editing) {
       (async () => {
         try {
@@ -220,34 +227,71 @@ export function AnalysisFormModal({
         saved = await createAnalysis(supabase, user.id, payload);
       }
 
-      // Upload pending screenshots
-      for (const s of screenshots) {
-        if (s.file && !s.storagePath) {
-          try {
+      // ---------- SCREENSHOT UPLOAD ----------
+      const pending = screenshots.filter((s) => s.file && !s.storagePath);
+      if (pending.length > 0) {
+        setUploadStatus(
+          `Uploading ${pending.length} image${pending.length > 1 ? "s" : ""}…`
+        );
+
+        // eslint-disable-next-line no-console
+        console.log("[ALLTRADES] upload attempt", {
+          userId: user.id,
+          analysisId: saved.id,
+          count: pending.length,
+          fileNames: pending.map((s) => s.file?.name),
+          fileSizes: pending.map((s) => s.file?.size),
+          fileTypes: pending.map((s) => s.file?.type),
+        });
+
+        const results = await Promise.allSettled(
+          pending.map(async (s) => {
             const { path } = await uploadScreenshot(
               supabase,
               user.id,
               `analyses/${saved.id}`,
-              s.file
+              s.file as File
             );
             await addAnalysisScreenshot(supabase, user.id, saved.id, path);
-          } catch (err) {
-            console.warn("Analysis screenshot upload failed", err);
-          }
+          })
+        );
+
+        // eslint-disable-next-line no-console
+        console.log("[ALLTRADES] upload results", results);
+
+        const failures = results.filter(
+          (r): r is PromiseRejectedResult => r.status === "rejected"
+        );
+        if (failures.length > 0) {
+          const first = failures[0]?.reason;
+          const detail =
+            first instanceof Error
+              ? first.message
+              : typeof first === "string"
+                ? first
+                : JSON.stringify(first);
+          // eslint-disable-next-line no-console
+          console.error("[ALLTRADES] upload failures", failures);
+          toast.warning(
+            `${failures.length} chart${failures.length > 1 ? "s" : ""} failed to upload`,
+            detail
+          );
         }
       }
 
-      // Remove deleted existing screenshots
+      // ---------- DELETE REMOVED SCREENSHOTS ----------
       if (isEdit && editing) {
         const existing = await listAnalysisScreenshots(supabase, editing.id);
         const keptIds = new Set(
           screenshots.filter((s) => s.id).map((s) => s.id as string)
         );
-        for (const r of existing) {
-          if (!keptIds.has(r.id)) {
-            await removeAnalysisScreenshot(supabase, r.id);
-          }
-        }
+        const toRemove = existing.filter((r) => !keptIds.has(r.id));
+        Promise.all(
+          toRemove.map(async (r) => {
+            await deleteScreenshot(supabase, r.storage_path).catch(() => {});
+            await removeAnalysisScreenshot(supabase, r.id).catch(() => {});
+          })
+        );
       }
 
       toast.success(isEdit ? "Analysis updated" : "Analysis saved");
@@ -259,6 +303,7 @@ export function AnalysisFormModal({
       toast.error("Could not save analysis", message);
     } finally {
       setSaving(false);
+      setUploadStatus(null);
     }
   }
 
@@ -280,252 +325,166 @@ export function AnalysisFormModal({
         </>
       }
     >
+      {uploadStatus && (
+        <div className="mb-4 rounded border border-brand-200 bg-brand-50 px-3 py-2 text-2xs text-brand-700">
+          {uploadStatus} Images are compressed automatically before upload.
+        </div>
+      )}
+
       <form onSubmit={onSubmit} className="space-y-6" noValidate>
-        {/* Market Context */}
         <Section title="Market Context">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Field label="Date" htmlFor="analysis_date" required error={errors.analysis_date}>
-              <Input
-                id="analysis_date"
-                type="date"
-                value={form.analysis_date}
+              <Input id="analysis_date" type="date" value={form.analysis_date}
                 onChange={(e) => set("analysis_date", e.target.value)}
-                invalid={!!errors.analysis_date}
-              />
+                invalid={!!errors.analysis_date} />
             </Field>
             <Field label="Time" htmlFor="analysis_time">
-              <Input
-                id="analysis_time"
-                type="time"
-                value={form.analysis_time}
-                onChange={(e) => set("analysis_time", e.target.value)}
-              />
+              <Input id="analysis_time" type="time" value={form.analysis_time}
+                onChange={(e) => set("analysis_time", e.target.value)} />
             </Field>
             <Field label="Instrument" htmlFor="instrument" required error={errors.instrument}>
-              <Select
-                id="instrument"
-                value={form.instrument}
+              <Select id="instrument" value={form.instrument}
                 onChange={(e) => set("instrument", e.target.value)}
                 options={INSTRUMENTS as unknown as string[]}
-                placeholder="Select instrument"
-                invalid={!!errors.instrument}
-              />
+                placeholder="Select instrument" invalid={!!errors.instrument} />
             </Field>
             <Field label="Timeframe" htmlFor="timeframe">
-              <Select
-                id="timeframe"
-                value={form.timeframe}
+              <Select id="timeframe" value={form.timeframe}
                 onChange={(e) => set("timeframe", e.target.value)}
                 options={TIMEFRAMES as unknown as string[]}
-                placeholder="Select timeframe"
-              />
+                placeholder="Select timeframe" />
             </Field>
             <Field label="Session" htmlFor="session">
-              <Select
-                id="session"
-                value={form.session}
+              <Select id="session" value={form.session}
                 onChange={(e) => set("session", e.target.value)}
                 options={SESSIONS as unknown as string[]}
-                placeholder="Select session"
-              />
+                placeholder="Select session" />
             </Field>
             <Field label="Market Bias" htmlFor="market_bias">
-              <Select
-                id="market_bias"
-                value={form.market_bias}
+              <Select id="market_bias" value={form.market_bias}
                 onChange={(e) => set("market_bias", e.target.value)}
                 options={MARKET_BIAS_OPTIONS as unknown as string[]}
-                placeholder="Select bias"
-              />
+                placeholder="Select bias" />
             </Field>
             <Field label="Market Structure" htmlFor="market_structure">
-              <Select
-                id="market_structure"
-                value={form.market_structure}
+              <Select id="market_structure" value={form.market_structure}
                 onChange={(e) => set("market_structure", e.target.value)}
                 options={MARKET_STRUCTURE_OPTIONS as unknown as string[]}
-                placeholder="Select structure"
-              />
+                placeholder="Select structure" />
             </Field>
           </div>
         </Section>
 
-        {/* Liquidity & Key Levels */}
         <Section title="Liquidity & Key Levels">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Field label="Previous Week High" htmlFor="prev_week_high">
-              <Input
-                id="prev_week_high"
-                type="number"
-                step="any"
+              <Input id="prev_week_high" type="number" step="any"
                 value={form.prev_week_high}
-                onChange={(e) => set("prev_week_high", e.target.value)}
-              />
+                onChange={(e) => set("prev_week_high", e.target.value)} />
             </Field>
             <Field label="Previous Week Low" htmlFor="prev_week_low">
-              <Input
-                id="prev_week_low"
-                type="number"
-                step="any"
+              <Input id="prev_week_low" type="number" step="any"
                 value={form.prev_week_low}
-                onChange={(e) => set("prev_week_low", e.target.value)}
-              />
+                onChange={(e) => set("prev_week_low", e.target.value)} />
             </Field>
             <Field label="Previous Day High" htmlFor="prev_day_high">
-              <Input
-                id="prev_day_high"
-                type="number"
-                step="any"
+              <Input id="prev_day_high" type="number" step="any"
                 value={form.prev_day_high}
-                onChange={(e) => set("prev_day_high", e.target.value)}
-              />
+                onChange={(e) => set("prev_day_high", e.target.value)} />
             </Field>
             <Field label="Previous Day Low" htmlFor="prev_day_low">
-              <Input
-                id="prev_day_low"
-                type="number"
-                step="any"
+              <Input id="prev_day_low" type="number" step="any"
                 value={form.prev_day_low}
-                onChange={(e) => set("prev_day_low", e.target.value)}
-              />
+                onChange={(e) => set("prev_day_low", e.target.value)} />
             </Field>
             <Field label="Liquidity Focus" htmlFor="liquidity_focus">
-              <Select
-                id="liquidity_focus"
-                value={form.liquidity_focus}
+              <Select id="liquidity_focus" value={form.liquidity_focus}
                 onChange={(e) => set("liquidity_focus", e.target.value)}
                 options={LIQUIDITY_FOCUS_OPTIONS as unknown as string[]}
-                placeholder="Select focus"
-              />
+                placeholder="Select focus" />
             </Field>
             <Field label="Support & Resistance" htmlFor="support_resistance">
-              <Input
-                id="support_resistance"
-                value={form.support_resistance}
+              <Input id="support_resistance" value={form.support_resistance}
                 onChange={(e) => set("support_resistance", e.target.value)}
-                placeholder="e.g. 1.0850 support / 1.0950 resistance"
-              />
+                placeholder="e.g. 1.0850 support / 1.0950 resistance" />
             </Field>
           </div>
         </Section>
 
-        {/* ICT / SMC Setup */}
         <Section title="ICT / SMC Setup">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Field label="Fair Value Gap" htmlFor="fair_value_gap">
-              <Select
-                id="fair_value_gap"
-                value={form.fair_value_gap}
+              <Select id="fair_value_gap" value={form.fair_value_gap}
                 onChange={(e) => set("fair_value_gap", e.target.value)}
                 options={FVG_OPTIONS as unknown as string[]}
-                placeholder="Select FVG"
-              />
+                placeholder="Select FVG" />
             </Field>
             <Field label="Order Blocks" htmlFor="order_blocks">
-              <Select
-                id="order_blocks"
-                value={form.order_blocks}
+              <Select id="order_blocks" value={form.order_blocks}
                 onChange={(e) => set("order_blocks", e.target.value)}
                 options={ORDER_BLOCK_OPTIONS as unknown as string[]}
-                placeholder="Select order blocks"
-              />
+                placeholder="Select order blocks" />
             </Field>
             <Field label="BOS / CHOCH" htmlFor="bos_choch">
-              <Select
-                id="bos_choch"
-                value={form.bos_choch}
+              <Select id="bos_choch" value={form.bos_choch}
                 onChange={(e) => set("bos_choch", e.target.value)}
                 options={BOS_CHOCH_OPTIONS as unknown as string[]}
-                placeholder="Select BOS/CHOCH"
-              />
+                placeholder="Select BOS/CHOCH" />
             </Field>
             <Field label="Setup" htmlFor="setup">
-              <Select
-                id="setup"
-                value={form.setup}
+              <Select id="setup" value={form.setup}
                 onChange={(e) => set("setup", e.target.value)}
                 options={ANALYSIS_SETUPS as unknown as string[]}
-                placeholder="Select setup"
-              />
+                placeholder="Select setup" />
             </Field>
           </div>
         </Section>
 
-        {/* Prediction & Trade Plan */}
         <Section title="Prediction & Trade Plan">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Field
-              label="Prediction"
-              htmlFor="prediction"
-              required
-              error={errors.prediction}
-              className="sm:col-span-2 lg:col-span-3"
-            >
-              <Textarea
-                id="prediction"
-                rows={3}
-                value={form.prediction}
+            <Field label="Prediction" htmlFor="prediction" required
+              error={errors.prediction} className="sm:col-span-2 lg:col-span-3">
+              <Textarea id="prediction" rows={3} value={form.prediction}
                 onChange={(e) => set("prediction", e.target.value)}
                 invalid={!!errors.prediction}
-                placeholder="Describe the expected move — direction, key level, liquidity target."
-              />
+                placeholder="Describe the expected move — direction, key level, liquidity target." />
             </Field>
             <Field label="Entry Zone" htmlFor="entry_zone">
-              <Input
-                id="entry_zone"
-                value={form.entry_zone}
+              <Input id="entry_zone" value={form.entry_zone}
                 onChange={(e) => set("entry_zone", e.target.value)}
-                placeholder="e.g. 1.0900 – 1.0910"
-              />
+                placeholder="e.g. 1.0900 – 1.0910" />
             </Field>
             <Field label="Invalidation" htmlFor="invalidation">
-              <Input
-                id="invalidation"
-                value={form.invalidation}
+              <Input id="invalidation" value={form.invalidation}
                 onChange={(e) => set("invalidation", e.target.value)}
-                placeholder="Level that would invalidate the idea"
-              />
+                placeholder="Level that would invalidate the idea" />
             </Field>
             <Field label="Stop Loss" htmlFor="stop_loss">
-              <Input
-                id="stop_loss"
-                type="number"
-                step="any"
+              <Input id="stop_loss" type="number" step="any"
                 value={form.stop_loss}
-                onChange={(e) => set("stop_loss", e.target.value)}
-              />
+                onChange={(e) => set("stop_loss", e.target.value)} />
             </Field>
             <Field label="Take Profit" htmlFor="take_profit">
-              <Input
-                id="take_profit"
-                type="number"
-                step="any"
+              <Input id="take_profit" type="number" step="any"
                 value={form.take_profit}
-                onChange={(e) => set("take_profit", e.target.value)}
-              />
+                onChange={(e) => set("take_profit", e.target.value)} />
             </Field>
             <Field label="Expected R:R" htmlFor="expected_rr">
-              <Select
-                id="expected_rr"
-                value={form.expected_rr}
+              <Select id="expected_rr" value={form.expected_rr}
                 onChange={(e) => set("expected_rr", e.target.value)}
                 options={RISK_REWARD_OPTIONS as unknown as string[]}
-                placeholder="Select R:R"
-              />
+                placeholder="Select R:R" />
             </Field>
             <Field label="Confidence" htmlFor="confidence">
-              <Select
-                id="confidence"
-                value={form.confidence}
+              <Select id="confidence" value={form.confidence}
                 onChange={(e) => set("confidence", e.target.value)}
                 options={CONFIDENCE_LEVELS as unknown as string[]}
-                placeholder="Select confidence"
-              />
+                placeholder="Select confidence" />
             </Field>
           </div>
         </Section>
 
-        {/* Chart Evidence */}
         <Section title="Chart Evidence">
           <ScreenshotUploader
             value={screenshots}
@@ -535,41 +494,25 @@ export function AnalysisFormModal({
           />
         </Section>
 
-        {/* Post-Market Review */}
         <Section title="Post-Market Review">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Prediction Outcome" htmlFor="outcome">
-              <Select
-                id="outcome"
-                value={form.outcome}
+              <Select id="outcome" value={form.outcome}
                 onChange={(e) => set("outcome", e.target.value as AnalysisOutcome)}
-                options={ANALYSIS_OUTCOMES as unknown as string[]}
-              />
+                options={ANALYSIS_OUTCOMES as unknown as string[]} />
             </Field>
             <Field label="Actual Move" htmlFor="actual_move">
-              <Textarea
-                id="actual_move"
-                rows={2}
-                value={form.actual_move}
+              <Textarea id="actual_move" rows={2} value={form.actual_move}
                 onChange={(e) => set("actual_move", e.target.value)}
-                placeholder="What actually happened"
-              />
+                placeholder="What actually happened" />
             </Field>
             <Field label="Lessons" htmlFor="lessons">
-              <Textarea
-                id="lessons"
-                rows={2}
-                value={form.lessons}
-                onChange={(e) => set("lessons", e.target.value)}
-              />
+              <Textarea id="lessons" rows={2} value={form.lessons}
+                onChange={(e) => set("lessons", e.target.value)} />
             </Field>
             <Field label="Notes" htmlFor="notes">
-              <Textarea
-                id="notes"
-                rows={2}
-                value={form.notes}
-                onChange={(e) => set("notes", e.target.value)}
-              />
+              <Textarea id="notes" rows={2} value={form.notes}
+                onChange={(e) => set("notes", e.target.value)} />
             </Field>
           </div>
         </Section>

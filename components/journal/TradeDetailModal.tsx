@@ -1,11 +1,12 @@
 ﻿"use client";
 
 import * as React from "react";
-import { Trash2, Pencil } from "lucide-react";
+import { Trash2, Pencil, Image as ImageIcon, AlertTriangle } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Lightbox, type LightboxImage } from "@/components/ui/Lightbox";
 import { createClient } from "@/lib/supabase/client";
 import { deleteTrade } from "@/lib/data/trades";
 import { listTradeScreenshots } from "@/lib/data/trade-screenshots";
@@ -22,6 +23,12 @@ export interface TradeDetailModalProps {
   onDeleted: () => void;
 }
 
+interface LoadedShot {
+  row: TradeScreenshot;
+  url: string | null;
+  error: string | null;
+}
+
 export function TradeDetailModal({
   trade,
   open,
@@ -31,31 +38,62 @@ export function TradeDetailModal({
 }: TradeDetailModalProps) {
   const supabase = React.useMemo(() => createClient(), []);
   const toast = useToast();
-  const [screenshots, setScreenshots] = React.useState<
-    { row: TradeScreenshot; url: string | null }[]
-  >([]);
+  const [screenshots, setScreenshots] = React.useState<LoadedShot[]>([]);
+  const [loadingShots, setLoadingShots] = React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [lightboxIndex, setLightboxIndex] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     if (!open || !trade) {
       setScreenshots([]);
       return;
     }
+
+    let cancelled = false;
+    setLoadingShots(true);
+
     (async () => {
       try {
         const rows = await listTradeScreenshots(supabase, trade.id);
-        const withUrls = await Promise.all(
-          rows.map(async (r) => ({
-            row: r,
-            url: await getSignedUrl(supabase, r.storage_path),
-          }))
+        // eslint-disable-next-line no-console
+        console.log("[ALLTRADES] trade detail screenshot rows", rows);
+
+        const loaded: LoadedShot[] = await Promise.all(
+          rows.map(async (r) => {
+            try {
+              const url = await getSignedUrl(supabase, r.storage_path);
+              return {
+                row: r,
+                url,
+                error: url ? null : "Could not generate signed URL",
+              };
+            } catch (e) {
+              return {
+                row: r,
+                url: null,
+                error: e instanceof Error ? e.message : "Signed URL error",
+              };
+            }
+          })
         );
-        setScreenshots(withUrls);
-      } catch {
-        setScreenshots([]);
+
+        // eslint-disable-next-line no-console
+        console.log("[ALLTRADES] trade detail loaded", loaded);
+
+        if (!cancelled) setScreenshots(loaded);
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error("[ALLTRADES] trade detail load failed", e);
+        if (!cancelled) setScreenshots([]);
+      } finally {
+        if (!cancelled) setLoadingShots(false);
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [open, trade, supabase]);
 
   async function onDelete() {
@@ -80,13 +118,43 @@ export function TradeDetailModal({
   const pl = Number(trade.profit_loss) || 0;
   const plClass =
     pl > 0 ? "text-profit-text" : pl < 0 ? "text-loss-text" : "text-ink-700";
-
   const tone =
     trade.result === "Win"
       ? "profit"
       : trade.result === "Loss"
         ? "loss"
         : "neutral";
+
+  const lightboxImages: LightboxImage[] = screenshots
+    .filter((s) => s.url)
+    .map((s) => ({
+      url: s.url as string,
+      alt: s.row.label,
+      caption: `${trade.instrument} · ${trade.trade_date} · ${s.row.label}`,
+      filename: `alltrades-${trade.instrument}-${trade.trade_date}-${s.row.label
+        .toLowerCase()
+        .replace(/\s+/g, "-")}.png`,
+    }));
+
+  async function downloadFromThumb(url: string, label: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `alltrades-${trade?.instrument}-${trade?.trade_date}-${label
+        .toLowerCase()
+        .replace(/\s+/g, "-")}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(href);
+    } catch {
+      window.open(url, "_blank", "noopener");
+    }
+  }
 
   return (
     <>
@@ -118,7 +186,6 @@ export function TradeDetailModal({
         }
       >
         <div className="space-y-5">
-          {/* Headline */}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-border bg-surface-soft px-4 py-3">
             <div>
               <Badge tone={tone}>{trade.result}</Badge>
@@ -132,7 +199,6 @@ export function TradeDetailModal({
             </div>
           </div>
 
-          {/* Grid of details */}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             <Detail label="Lot size" value={fmt(trade.lot_size)} />
             <Detail label="Entry" value={fmt(trade.entry_price)} />
@@ -155,7 +221,6 @@ export function TradeDetailModal({
             <Detail label="News / event" value={trade.news_event ?? "—"} />
           </div>
 
-          {/* Long-form */}
           <LongForm title="Entry reason" value={trade.entry_reason} />
           <LongForm title="Exit reason" value={trade.exit_reason} />
           <LongForm title="Management" value={trade.management} />
@@ -163,36 +228,117 @@ export function TradeDetailModal({
           <LongForm title="Emotions" value={trade.emotions} />
           <LongForm title="Notes" value={trade.notes} />
 
-          {/* Screenshots */}
-          {screenshots.length > 0 && (
-            <div>
+          {/* SCREENSHOTS */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
               <h3 className="text-2xs font-semibold uppercase tracking-wider text-ink-500">
-                Screenshots
+                Screenshots{" "}
+                {screenshots.length > 0 ? `(${screenshots.length})` : ""}
               </h3>
-              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {screenshots.map(({ row, url }) =>
-                  url ? (
-                    <a
-                      key={row.id}
-                      href={url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block overflow-hidden rounded border border-border"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={url}
-                        alt={row.label}
-                        className="h-32 w-full object-cover transition-transform hover:scale-[1.02]"
-                      />
-                    </a>
-                  ) : null
-                )}
-              </div>
+              {lightboxImages.length > 0 && (
+                <span className="text-3xs text-ink-500">
+                  Click any image to enlarge
+                </span>
+              )}
             </div>
-          )}
+
+            {loadingShots ? (
+              <div className="rounded border border-border bg-surface-soft px-4 py-6 text-center text-2xs text-ink-500">
+                Loading screenshots…
+              </div>
+            ) : screenshots.length === 0 ? (
+              <div className="flex items-center gap-2 rounded border border-dashed border-border-strong bg-surface-soft px-4 py-6 text-2xs text-ink-500">
+                <ImageIcon className="h-4 w-4" />
+                No screenshots attached to this trade.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {screenshots.map((s, i) => {
+                  if (!s.url) {
+                    return (
+                      <div
+                        key={s.row.id}
+                        className="flex items-start gap-2 rounded border border-warn-border bg-warn-bg px-3 py-2 text-2xs text-warn-text"
+                      >
+                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <div>
+                          <div className="font-medium">
+                            {s.row.label} could not be displayed
+                          </div>
+                          <div className="text-3xs opacity-80">
+                            {s.error ?? "Unknown error"}. File exists at{" "}
+                            <code>{s.row.storage_path}</code>.
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div
+                      key={s.row.id}
+                      className="overflow-hidden rounded-lg border border-border bg-surface-soft"
+                    >
+                      <div className="flex items-center justify-between border-b border-border bg-white px-3 py-2">
+                        <span className="text-2xs font-medium text-ink-700">
+                          {s.row.label}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setLightboxIndex(i)}
+                            className="rounded px-2 py-1 text-3xs text-ink-600 hover:bg-ink-100"
+                            title="Open full size"
+                          >
+                            View full size
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) =>
+                              downloadFromThumb(s.url!, s.row.label, e)
+                            }
+                            className="rounded px-2 py-1 text-3xs text-ink-600 hover:bg-ink-100"
+                            title="Download"
+                          >
+                            Download
+                          </button>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setLightboxIndex(i)}
+                        className="block w-full cursor-zoom-in"
+                        aria-label="Open image in full size"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={s.url}
+                          alt={s.row.label}
+                          className="max-h-[420px] w-full bg-ink-950/5 object-contain"
+                          loading="lazy"
+                          onError={() => {
+                            // eslint-disable-next-line no-console
+                            console.error("[ALLTRADES] <img> failed to load", {
+                              src: s.url,
+                              storagePath: s.row.storage_path,
+                            });
+                          }}
+                        />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </Modal>
+
+      <Lightbox
+        images={lightboxImages}
+        index={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+        onIndexChange={setLightboxIndex}
+      />
 
       <ConfirmDialog
         open={confirmDelete}
@@ -221,7 +367,9 @@ function money(v: number | null | undefined): string {
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-3xs uppercase tracking-wide text-ink-500">{label}</div>
+      <div className="text-3xs uppercase tracking-wide text-ink-500">
+        {label}
+      </div>
       <div className="mt-0.5 text-xs font-medium text-ink-900">{value}</div>
     </div>
   );
