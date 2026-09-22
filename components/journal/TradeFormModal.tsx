@@ -258,63 +258,90 @@ export function TradeFormModal({
         savedTrade = await createTrade(supabase, user.id, payload);
       }
 
+      // -------- SCREENSHOT HANDLING (sequential, verbose, per-file) --------
       const pending = screenshots.filter((s) => s.file && !s.storagePath);
+
+      console.log("[ALLTRADES] trade save complete", {
+        tradeId: savedTrade.id,
+        pendingCount: pending.length,
+        allScreenshots: screenshots.map((s) => ({
+          hasFile: !!s.file,
+          hasStoragePath: !!s.storagePath,
+          fileName: s.file?.name,
+          fileSize: s.file?.size,
+          fileType: s.file?.type,
+          urlScheme: s.url.split(":")[0],
+        })),
+      });
+
       if (pending.length > 0) {
         setUploadStatus(
           `Uploading ${pending.length} image${pending.length > 1 ? "s" : ""}…`
         );
 
-        // eslint-disable-next-line no-console
-        console.log("[ALLTRADES] upload attempt", {
-          userId: user.id,
-          tradeId: savedTrade.id,
-          count: pending.length,
-          fileNames: pending.map((s) => s.file?.name),
-          fileSizes: pending.map((s) => s.file?.size),
-          fileTypes: pending.map((s) => s.file?.type),
-        });
+        for (let i = 0; i < pending.length; i++) {
+          const s = pending[i];
+          const file = s.file as File;
 
-        const results = await Promise.allSettled(
-          pending.map(async (s) => {
-            const { path } = await uploadScreenshot(
-              supabase,
-              user.id,
-              `trades/${savedTrade.id}`,
-              s.file as File
-            );
-            await addTradeScreenshot(
-              supabase,
-              user.id,
-              savedTrade.id,
+          try {
+            console.log("[ALLTRADES] uploading file", {
+              index: i + 1,
+              name: file.name,
+              size: file.size,
+              type: file.type,
+            });
+
+            const { path, originalSize, compressedSize } =
+              await uploadScreenshot(
+                supabase,
+                user.id,
+                `trades/${savedTrade.id}`,
+                file
+              );
+
+            console.log("[ALLTRADES] storage upload OK", {
               path,
-              "Analysis"
-            );
-          })
-        );
+              originalSize,
+              compressedSize,
+            });
 
-        // eslint-disable-next-line no-console
-        console.log("[ALLTRADES] upload results", results);
-
-        const failures = results.filter(
-          (r): r is PromiseRejectedResult => r.status === "rejected"
-        );
-        if (failures.length > 0) {
-          const first = failures[0]?.reason;
-          const detail =
-            first instanceof Error
-              ? first.message
-              : typeof first === "string"
-                ? first
-                : JSON.stringify(first);
-          // eslint-disable-next-line no-console
-          console.error("[ALLTRADES] upload failures", failures);
-          toast.warning(
-            `${failures.length} screenshot${failures.length > 1 ? "s" : ""} failed to upload`,
-            detail
-          );
+            try {
+              const row = await addTradeScreenshot(
+                supabase,
+                user.id,
+                savedTrade.id,
+                path,
+                "Analysis"
+              );
+              console.log("[ALLTRADES] DB row inserted OK", row);
+            } catch (dbErr) {
+              console.error(
+                "[ALLTRADES] DB row insert FAILED - file is in Storage but not linked in DB",
+                dbErr
+              );
+              const msg =
+                dbErr instanceof Error ? dbErr.message : String(dbErr);
+              toast.warning("Screenshot uploaded but not linked", msg);
+            }
+          } catch (uploadErr) {
+            console.error("[ALLTRADES] storage upload FAILED", {
+              fileName: file.name,
+              fileSize: file.size,
+              fileType: file.type,
+              error: uploadErr,
+              errorMessage:
+                uploadErr instanceof Error
+                  ? uploadErr.message
+                  : String(uploadErr),
+            });
+            const msg =
+              uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
+            toast.error("Screenshot upload failed", msg);
+          }
         }
       }
 
+      // -------- REMOVALS --------
       if (isEdit && editing) {
         const existing = await listTradeScreenshots(supabase, editing.id);
         const keptIds = new Set(

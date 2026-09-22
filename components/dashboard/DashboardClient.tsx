@@ -6,10 +6,16 @@ import { Plus } from "lucide-react";
 import { useCurrentAccount } from "@/components/layout/AppShell";
 import { useTrades, useWithdrawals } from "@/lib/data/hooks";
 import { computeAccountMetrics, computeDrawdownStatus } from "@/lib/calc";
+import {
+  computePayoutEligibility,
+  computeProfitSplit,
+  computeSurvival,
+} from "@/lib/rules";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { AccountHeader } from "@/components/layout/AccountHeader";
-import { MetricCard } from "@/components/ui/Card";
+import { MetricCard, Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 import { BlockLoader } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { WithdrawalStatusCard } from "./WithdrawalStatusCard";
@@ -17,7 +23,12 @@ import { WeeklyDisciplineCard } from "./WeeklyDisciplineCard";
 import { ConsistencySummaryCard } from "./ConsistencySummaryCard";
 import { RecentTradesCard } from "./RecentTradesCard";
 import { AccountRiskCard } from "./AccountRiskCard";
-import { formatCurrency, formatPercent } from "@/lib/utils";
+import { DailyTargetRiskCard } from "./DailyTargetRiskCard";
+import { AccountSurvivalCard } from "./AccountSurvivalCard";
+import { PropFirmStatusCard } from "./PropFirmStatusCard";
+import { ProfitSplitCard } from "./ProfitSplitCard";
+import { PayoutCountdownCard } from "./PayoutCountdownCard";
+import { cn, formatCurrency, formatPercent } from "@/lib/utils";
 
 export function DashboardClient() {
   const { currentAccount, currentAccountId } = useCurrentAccount();
@@ -34,6 +45,18 @@ export function DashboardClient() {
   );
   const drawdown = React.useMemo(
     () => computeDrawdownStatus(currentAccount, trades, withdrawals),
+    [currentAccount, trades, withdrawals]
+  );
+  const survival = React.useMemo(
+    () => computeSurvival(currentAccount, trades, withdrawals),
+    [currentAccount, trades, withdrawals]
+  );
+  const split = React.useMemo(
+    () => computeProfitSplit(currentAccount, trades, withdrawals),
+    [currentAccount, trades, withdrawals]
+  );
+  const payout = React.useMemo(
+    () => computePayoutEligibility(currentAccount, trades, withdrawals),
     [currentAccount, trades, withdrawals]
   );
   const recentTrades = React.useMemo(() => trades.slice(0, 8), [trades]);
@@ -113,6 +136,28 @@ export function DashboardClient() {
                       : `${metrics.weeklyRemaining} remaining this week`
                   }
                 />
+              </div>
+
+              {/* --- ACCOUNT SURVIVAL + PROP-FIRM --- */}
+              <div className="grid gap-4 lg:grid-cols-3">
+                <div className="lg:col-span-2">
+                  <AccountSurvivalCard survival={survival} />
+                </div>
+                <PropFirmStatusCard account={currentAccount} survival={survival} />
+              </div>
+
+              {/* --- DAILY TARGET & RISK --- */}
+              <DailyTargetRiskCard
+                todayPnL={drawdown.todayPnL}
+                currentCapital={metrics.currentCapital}
+                targetPercent={0.5}
+                riskPercent={0.25}
+              />
+
+              {/* --- PROFIT SPLIT + PAYOUT --- */}
+              <div className="grid gap-4 lg:grid-cols-2">
+                <ProfitSplitCard split={split} />
+                <PayoutCountdownCard payout={payout} />
               </div>
 
               <div className="grid gap-4 lg:grid-cols-3">

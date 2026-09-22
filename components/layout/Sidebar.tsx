@@ -14,6 +14,10 @@ import {
   Settings,
   LogOut,
   X,
+  ClipboardList,
+  Calculator,
+  Layers,
+  ScrollText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +29,8 @@ interface NavItem {
 
 const WORKSPACE: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/trade-check", label: "Trade Check", icon: ClipboardList },
+  { href: "/position-calculator", label: "Position Calculator", icon: Calculator },
   { href: "/journal", label: "Journal", icon: BookOpen },
   { href: "/analysis", label: "Analysis", icon: ScanSearch },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
@@ -34,7 +40,9 @@ const WORKSPACE: NavItem[] = [
 
 const ACCOUNT: NavItem[] = [
   { href: "/consistency", label: "Consistency", icon: ShieldCheck },
+  { href: "/rules", label: "Rules", icon: ScrollText },
   { href: "/withdrawals", label: "Withdrawals", icon: ArrowUpRight },
+  { href: "/portfolio", label: "Portfolio", icon: Layers },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -148,7 +156,7 @@ function SidebarSection({
             <li key={item.href}>
               <Link
                 href={item.href}
-                prefetch={true}
+                prefetch
                 onClick={onNavigate}
                 className={cn(
                   "flex items-center gap-2.5 rounded px-3 py-2 text-sm transition-colors",

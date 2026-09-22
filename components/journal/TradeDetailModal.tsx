@@ -13,7 +13,7 @@ import { listTradeScreenshots } from "@/lib/data/trade-screenshots";
 import { getSignedUrl } from "@/lib/data/screenshots";
 import { useToast } from "@/components/ui/Toast";
 import type { Trade, TradeScreenshot } from "@/lib/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, parseNumberOrNull } from "@/lib/utils";
 
 export interface TradeDetailModalProps {
   trade: Trade | null;
@@ -27,6 +27,29 @@ interface LoadedShot {
   row: TradeScreenshot;
   url: string | null;
   error: string | null;
+}
+
+function computeActualRR(trade: Trade): { value: number | null; label: string } {
+  const risk = parseNumberOrNull(trade.risk_amount);
+  const pl = Number(trade.profit_loss) || 0;
+  if (!risk || risk <= 0) return { value: null, label: "—" };
+  const r = pl / risk;
+  if (!Number.isFinite(r)) return { value: null, label: "—" };
+  return { value: r, label: `1:${r.toFixed(2)}` };
+}
+
+function computePlannedRR(trade: Trade): { value: number | null; label: string } {
+  const raw = trade.risk_reward;
+  if (!raw) return { value: null, label: "—" };
+  const cleaned = raw.replace(/\s+/g, "");
+  const m = cleaned.match(/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/);
+  if (!m) return { value: null, label: raw };
+  const a = Number(m[1]);
+  const b = Number(m[2]);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0) {
+    return { value: null, label: raw };
+  }
+  return { value: b / a, label: `1:${(b / a).toFixed(2)}` };
 }
 
 export function TradeDetailModal({
@@ -56,7 +79,6 @@ export function TradeDetailModal({
     (async () => {
       try {
         const rows = await listTradeScreenshots(supabase, trade.id);
-        // eslint-disable-next-line no-console
         console.log("[ALLTRADES] trade detail screenshot rows", rows);
 
         const loaded: LoadedShot[] = await Promise.all(
@@ -78,12 +100,9 @@ export function TradeDetailModal({
           })
         );
 
-        // eslint-disable-next-line no-console
         console.log("[ALLTRADES] trade detail loaded", loaded);
-
         if (!cancelled) setScreenshots(loaded);
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.error("[ALLTRADES] trade detail load failed", e);
         if (!cancelled) setScreenshots([]);
       } finally {
@@ -124,6 +143,27 @@ export function TradeDetailModal({
       : trade.result === "Loss"
         ? "loss"
         : "neutral";
+
+  const planned = computePlannedRR(trade);
+  const actual = computeActualRR(trade);
+  const rrDelta =
+    planned.value !== null && actual.value !== null
+      ? actual.value - planned.value
+      : null;
+  const rrDirection =
+    rrDelta === null
+      ? "unknown"
+      : Math.abs(rrDelta) < 0.05
+        ? "match"
+        : rrDelta > 0
+          ? "better"
+          : "worse";
+  const rrDeltaClass =
+    rrDirection === "better"
+      ? "text-profit-text"
+      : rrDirection === "worse"
+        ? "text-loss-text"
+        : "text-ink-500";
 
   const lightboxImages: LightboxImage[] = screenshots
     .filter((s) => s.url)
@@ -206,7 +246,6 @@ export function TradeDetailModal({
             <Detail label="Stop loss" value={fmt(trade.stop_loss)} />
             <Detail label="Take profit" value={fmt(trade.take_profit)} />
             <Detail label="Risk amount" value={money(trade.risk_amount)} />
-            <Detail label="R:R" value={trade.risk_reward ?? "—"} />
             <Detail label="Pips" value={fmt(trade.pips)} />
             <Detail label="Commission" value={money(trade.commission)} />
             <Detail label="Swap" value={money(trade.swap)} />
@@ -221,6 +260,40 @@ export function TradeDetailModal({
             <Detail label="News / event" value={trade.news_event ?? "—"} />
           </div>
 
+          {/* ---- Planned vs Actual RR ---- */}
+          <div className="rounded-lg border border-border bg-surface-soft p-4">
+            <h3 className="text-2xs font-semibold uppercase tracking-wider text-ink-500">
+              Risk : Reward
+            </h3>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <RRStat label="Planned" value={planned.label} tone="neutral" />
+              <RRStat
+                label="Actual"
+                value={actual.label}
+                tone={
+                  rrDirection === "better"
+                    ? "profit"
+                    : rrDirection === "worse"
+                      ? "loss"
+                      : "neutral"
+                }
+              />
+              <div>
+                <div className="text-3xs uppercase tracking-wide text-ink-500">
+                  Outcome
+                </div>
+                <div className={`mt-0.5 text-xs font-medium ${rrDeltaClass}`}>
+                  {rrDirection === "better" &&
+                    `Closed better than planned (+${rrDelta?.toFixed(2)}R)`}
+                  {rrDirection === "worse" &&
+                    `Closed worse than planned (${rrDelta?.toFixed(2)}R)`}
+                  {rrDirection === "match" && "Matched planned RR"}
+                  {rrDirection === "unknown" && "—"}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <LongForm title="Entry reason" value={trade.entry_reason} />
           <LongForm title="Exit reason" value={trade.exit_reason} />
           <LongForm title="Management" value={trade.management} />
@@ -228,12 +301,11 @@ export function TradeDetailModal({
           <LongForm title="Emotions" value={trade.emotions} />
           <LongForm title="Notes" value={trade.notes} />
 
-          {/* SCREENSHOTS */}
+          {/* ---- Screenshots ---- */}
           <div>
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-2xs font-semibold uppercase tracking-wider text-ink-500">
-                Screenshots{" "}
-                {screenshots.length > 0 ? `(${screenshots.length})` : ""}
+                Screenshots {screenshots.length > 0 ? `(${screenshots.length})` : ""}
               </h3>
               {lightboxImages.length > 0 && (
                 <span className="text-3xs text-ink-500">
@@ -266,8 +338,8 @@ export function TradeDetailModal({
                             {s.row.label} could not be displayed
                           </div>
                           <div className="text-3xs opacity-80">
-                            {s.error ?? "Unknown error"}. File exists at{" "}
-                            <code>{s.row.storage_path}</code>.
+                            {s.error ?? "Unknown error"}. Path:{" "}
+                            <code>{s.row.storage_path}</code>
                           </div>
                         </div>
                       </div>
@@ -291,6 +363,15 @@ export function TradeDetailModal({
                           >
                             View full size
                           </button>
+                          <a
+                            href={s.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded px-2 py-1 text-3xs text-ink-600 hover:bg-ink-100"
+                            title="Open in new tab"
+                          >
+                            Open
+                          </a>
                           <button
                             type="button"
                             onClick={(e) =>
@@ -314,12 +395,16 @@ export function TradeDetailModal({
                           src={s.url}
                           alt={s.row.label}
                           className="max-h-[420px] w-full bg-ink-950/5 object-contain"
-                          loading="lazy"
+                          referrerPolicy="no-referrer"
                           onError={() => {
-                            // eslint-disable-next-line no-console
                             console.error("[ALLTRADES] <img> failed to load", {
                               src: s.url,
                               storagePath: s.row.storage_path,
+                            });
+                          }}
+                          onLoad={() => {
+                            console.log("[ALLTRADES] <img> loaded OK", {
+                              path: s.row.storage_path,
                             });
                           }}
                         />
@@ -367,10 +452,31 @@ function money(v: number | null | undefined): string {
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-3xs uppercase tracking-wide text-ink-500">
-        {label}
-      </div>
+      <div className="text-3xs uppercase tracking-wide text-ink-500">{label}</div>
       <div className="mt-0.5 text-xs font-medium text-ink-900">{value}</div>
+    </div>
+  );
+}
+
+function RRStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "profit" | "loss" | "neutral";
+}) {
+  const cls =
+    tone === "profit"
+      ? "text-profit-text"
+      : tone === "loss"
+        ? "text-loss-text"
+        : "text-ink-900";
+  return (
+    <div>
+      <div className="text-3xs uppercase tracking-wide text-ink-500">{label}</div>
+      <div className={`tabular mt-0.5 text-sm font-semibold ${cls}`}>{value}</div>
     </div>
   );
 }

@@ -32,25 +32,75 @@ export async function uploadScreenshot(
   file: File,
   onProgress?: (percent: number) => void
 ): Promise<UploadResult> {
+  console.log("[ALLTRADES] uploadScreenshot start", {
+    userId,
+    prefix,
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type,
+  });
+
   const invalid = validateScreenshotFile(file);
-  if (invalid) throw new Error(invalid);
+  if (invalid) {
+    console.error("[ALLTRADES] uploadScreenshot validation failed:", invalid);
+    throw new Error(invalid);
+  }
 
   onProgress?.(5);
-  const { file: compressed, originalSize, compressedSize } = await compressImage(file);
+
+  let compressed: File;
+  let originalSize = file.size;
+  let compressedSize = file.size;
+  try {
+    const result = await compressImage(file);
+    compressed = result.file;
+    originalSize = result.originalSize;
+    compressedSize = result.compressedSize;
+    console.log("[ALLTRADES] compression done", {
+      originalSize,
+      compressedSize,
+      ratio: result.ratio,
+      newFileName: compressed.name,
+      newFileType: compressed.type,
+    });
+  } catch (e) {
+    console.error("[ALLTRADES] compression FAILED", e);
+    throw e;
+  }
+
   onProgress?.(25);
 
   const ext = compressed.name.split(".").pop()?.toLowerCase() || "jpg";
   const rand = Math.random().toString(36).slice(2, 10);
   const path = `${userId}/${prefix}/${Date.now()}-${rand}.${ext}`;
 
-  const { error } = await supabase.storage
+  console.log("[ALLTRADES] uploading to storage", {
+    bucket: BUCKET,
+    path,
+    contentType: compressed.type,
+    size: compressed.size,
+  });
+
+  const { data, error } = await supabase.storage
     .from(BUCKET)
     .upload(path, compressed, {
       cacheControl: "31536000",
       upsert: false,
       contentType: compressed.type,
     });
-  if (error) throw error;
+
+  if (error) {
+    console.error("[ALLTRADES] storage upload FAILED", {
+      message: error.message,
+      name: error.name,
+      error,
+    });
+    throw new Error(
+      `Storage upload failed: ${error.message} (bucket: ${BUCKET}, path: ${path})`
+    );
+  }
+
+  console.log("[ALLTRADES] storage upload succeeded", { path, data });
 
   onProgress?.(100);
   return { path, originalSize, compressedSize };
@@ -100,33 +150,17 @@ export async function getSignedUrl(
   const cached = signedUrlCache.get(storagePath);
   const now = Date.now();
   if (cached && cached.expiresAt - 60_000 > now) {
-    // eslint-disable-next-line no-console
-    console.log("[ALLTRADES] getSignedUrl cache hit", storagePath);
     return cached.url;
   }
-
-  // eslint-disable-next-line no-console
-  console.log("[ALLTRADES] getSignedUrl request", storagePath);
 
   const { data, error } = await supabase.storage
     .from(BUCKET)
     .createSignedUrl(storagePath, expiresInSeconds);
 
   if (error || !data?.signedUrl) {
-    // eslint-disable-next-line no-console
-    console.error("[ALLTRADES] getSignedUrl FAILED", {
-      storagePath,
-      error,
-      data,
-    });
+    console.error("[ALLTRADES] getSignedUrl FAILED", { storagePath, error });
     return null;
   }
-
-  // eslint-disable-next-line no-console
-  console.log("[ALLTRADES] getSignedUrl OK", {
-    storagePath,
-    url: data.signedUrl.slice(0, 80) + "…",
-  });
 
   signedUrlCache.set(storagePath, {
     url: data.signedUrl,
