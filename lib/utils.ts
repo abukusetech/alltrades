@@ -44,11 +44,30 @@ export function formatNumber(
   return value.toFixed(digits);
 }
 
+// ---------- Date helpers (timezone-safe, Sunday-first weeks) ----------
+
+/** Local YYYY-MM-DD key. Uses LOCAL date parts — never UTC. */
+export function toDateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Parse YYYY-MM-DD into a Date at LOCAL midnight.
+ * (Avoids the `new Date("YYYY-MM-DD")` UTC-shift bug.)
+ */
+export function parseDateKey(key: string): Date {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, (m ?? 1) - 1, d ?? 1);
+}
+
+/** Sunday-start week (columns are Sun → Sat). */
 export function startOfWeek(d: Date): Date {
-  const date = new Date(d);
-  const day = date.getDay();
-  const diff = (day + 6) % 7;
-  date.setDate(date.getDate() - diff);
+  const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = date.getDay(); // 0 = Sunday
+  date.setDate(date.getDate() - day); // back to Sunday
   date.setHours(0, 0, 0, 0);
   return date;
 }
@@ -67,17 +86,6 @@ export function startOfMonth(d: Date): Date {
 
 export function endOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
-}
-
-export function toDateKey(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-export function parseDateKey(key: string): Date {
-  return new Date(key + "T00:00:00");
 }
 
 export function formatDateShort(d: Date): string {
