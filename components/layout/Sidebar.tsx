@@ -18,6 +18,7 @@ import {
   Calculator,
   Layers,
   ScrollText,
+  Sunrise,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,7 @@ interface NavItem {
 
 const WORKSPACE: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/daily-analysis", label: "Daily Analysis", icon: Sunrise },
   { href: "/trade-check", label: "Trade Check", icon: ClipboardList },
   { href: "/position-calculator", label: "Position Calculator", icon: Calculator },
   { href: "/journal", label: "Journal", icon: BookOpen },

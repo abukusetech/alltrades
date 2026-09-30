@@ -88,7 +88,7 @@ function personalStopPercent(account: Account): number {
   return Number((account as unknown as { personal_daily_stop_percent?: number }).personal_daily_stop_percent) || 0.5;
 }
 function payoutMinDays(account: Account): number {
-  return Number((account as unknown as { payout_min_trading_days?: number }).payout_min_trading_days) || 7;
+  return Number((account as unknown as { payout_min_trading_days?: number }).payout_min_trading_days) || 10;
 }
 
 // ---------- Survival snapshot ----------
@@ -238,8 +238,8 @@ export function computePayoutEligibility(
   if (!account) {
     return {
       tradingDaysThisMonth: 0,
-      requiredTradingDays: 7,
-      daysRemaining: 7,
+      requiredTradingDays: 10,
+      daysRemaining: 10,
       eligibleByDays: false,
       eligibleByProfit: false,
       eligibleByConsistency: false,
@@ -527,3 +527,5 @@ export function computePerformanceScore(
 
   return { total: Math.round(total), breakdown };
 }
+
+

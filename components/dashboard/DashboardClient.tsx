@@ -25,6 +25,7 @@ import { RecentTradesCard } from "./RecentTradesCard";
 import { AccountRiskCard } from "./AccountRiskCard";
 import { DailyTargetRiskCard } from "./DailyTargetRiskCard";
 import { AccountSurvivalCard } from "./AccountSurvivalCard";
+import { TodaysAnalysisWidget } from "./TodaysAnalysisWidget";
 import { PropFirmStatusCard } from "./PropFirmStatusCard";
 import { ProfitSplitCard } from "./ProfitSplitCard";
 import { PayoutCountdownCard } from "./PayoutCountdownCard";
@@ -183,3 +184,4 @@ export function DashboardClient() {
     </div>
   );
 }
+

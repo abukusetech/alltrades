@@ -1,7 +1,14 @@
 ﻿"use client";
 
 import * as React from "react";
-import { Trash2, Pencil, Image as ImageIcon, AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import {
+  Trash2,
+  Pencil,
+  Image as ImageIcon,
+  AlertTriangle,
+  Sunrise,
+} from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -11,9 +18,10 @@ import { createClient } from "@/lib/supabase/client";
 import { deleteTrade } from "@/lib/data/trades";
 import { listTradeScreenshots } from "@/lib/data/trade-screenshots";
 import { getSignedUrl } from "@/lib/data/screenshots";
+import { getDailyAnalysisById } from "@/lib/data/daily-analyses";
 import { useToast } from "@/components/ui/Toast";
-import type { Trade, TradeScreenshot } from "@/lib/types";
-import { formatCurrency, parseNumberOrNull } from "@/lib/utils";
+import type { Trade, TradeScreenshot, DailyAnalysis } from "@/lib/types";
+import { formatCurrency, formatDateLong, parseNumberOrNull } from "@/lib/utils";
 
 export interface TradeDetailModalProps {
   trade: Trade | null;
@@ -66,10 +74,12 @@ export function TradeDetailModal({
   const [confirmDelete, setConfirmDelete] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
   const [lightboxIndex, setLightboxIndex] = React.useState<number | null>(null);
+  const [analysis, setAnalysis] = React.useState<DailyAnalysis | null>(null);
 
   React.useEffect(() => {
     if (!open || !trade) {
       setScreenshots([]);
+      setAnalysis(null);
       return;
     }
 
@@ -79,8 +89,6 @@ export function TradeDetailModal({
     (async () => {
       try {
         const rows = await listTradeScreenshots(supabase, trade.id);
-        console.log("[ALLTRADES] trade detail screenshot rows", rows);
-
         const loaded: LoadedShot[] = await Promise.all(
           rows.map(async (r) => {
             try {
@@ -99,14 +107,20 @@ export function TradeDetailModal({
             }
           })
         );
-
-        console.log("[ALLTRADES] trade detail loaded", loaded);
         if (!cancelled) setScreenshots(loaded);
-      } catch (e) {
-        console.error("[ALLTRADES] trade detail load failed", e);
+      } catch {
         if (!cancelled) setScreenshots([]);
       } finally {
         if (!cancelled) setLoadingShots(false);
+      }
+
+      if (trade.daily_analysis_id) {
+        try {
+          const a = await getDailyAnalysisById(supabase, trade.daily_analysis_id);
+          if (!cancelled) setAnalysis(a);
+        } catch {
+          if (!cancelled) setAnalysis(null);
+        }
       }
     })();
 
@@ -239,6 +253,28 @@ export function TradeDetailModal({
             </div>
           </div>
 
+          {/* Daily Analysis link */}
+          {analysis && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-brand-200 bg-brand-50 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Sunrise className="h-4 w-4 text-brand-700" />
+                <div>
+                  <div className="text-2xs font-semibold text-brand-800">
+                    Linked Daily Analysis
+                  </div>
+                  <div className="text-3xs text-brand-700">
+                    {formatDateLong(new Date(analysis.analysis_date + "T00:00:00"))}
+                  </div>
+                </div>
+              </div>
+              <Link href={`/daily-analysis?date=${analysis.analysis_date}`}>
+                <Button variant="outline" size="sm">
+                  Open analysis →
+                </Button>
+              </Link>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             <Detail label="Lot size" value={fmt(trade.lot_size)} />
             <Detail label="Entry" value={fmt(trade.entry_price)} />
@@ -260,7 +296,6 @@ export function TradeDetailModal({
             <Detail label="News / event" value={trade.news_event ?? "—"} />
           </div>
 
-          {/* ---- Planned vs Actual RR ---- */}
           <div className="rounded-lg border border-border bg-surface-soft p-4">
             <h3 className="text-2xs font-semibold uppercase tracking-wider text-ink-500">
               Risk : Reward
@@ -297,11 +332,31 @@ export function TradeDetailModal({
           <LongForm title="Entry reason" value={trade.entry_reason} />
           <LongForm title="Exit reason" value={trade.exit_reason} />
           <LongForm title="Management" value={trade.management} />
+          <LongForm title="What I did well" value={trade.what_went_well} />
           <LongForm title="Mistakes" value={trade.mistakes} />
           <LongForm title="Emotions" value={trade.emotions} />
+          <LongForm title="Market observation" value={trade.market_observation} />
+          <LongForm title="Lesson" value={trade.lesson} />
           <LongForm title="Notes" value={trade.notes} />
 
-          {/* ---- Screenshots ---- */}
+          {trade.mistake_tags && trade.mistake_tags.length > 0 && (
+            <div>
+              <h3 className="text-2xs font-semibold uppercase tracking-wider text-ink-500">
+                Mistake tags
+              </h3>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {trade.mistake_tags.map((t) => (
+                  <span
+                    key={t}
+                    className="rounded border border-warn-border bg-warn-bg px-2 py-0.5 text-3xs text-warn-text"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-2xs font-semibold uppercase tracking-wider text-ink-500">
@@ -338,8 +393,7 @@ export function TradeDetailModal({
                             {s.row.label} could not be displayed
                           </div>
                           <div className="text-3xs opacity-80">
-                            {s.error ?? "Unknown error"}. Path:{" "}
-                            <code>{s.row.storage_path}</code>
+                            {s.error ?? "Unknown error"}
                           </div>
                         </div>
                       </div>
@@ -359,26 +413,15 @@ export function TradeDetailModal({
                             type="button"
                             onClick={() => setLightboxIndex(i)}
                             className="rounded px-2 py-1 text-3xs text-ink-600 hover:bg-ink-100"
-                            title="Open full size"
                           >
                             View full size
                           </button>
-                          <a
-                            href={s.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="rounded px-2 py-1 text-3xs text-ink-600 hover:bg-ink-100"
-                            title="Open in new tab"
-                          >
-                            Open
-                          </a>
                           <button
                             type="button"
                             onClick={(e) =>
                               downloadFromThumb(s.url!, s.row.label, e)
                             }
                             className="rounded px-2 py-1 text-3xs text-ink-600 hover:bg-ink-100"
-                            title="Download"
                           >
                             Download
                           </button>
@@ -388,7 +431,6 @@ export function TradeDetailModal({
                         type="button"
                         onClick={() => setLightboxIndex(i)}
                         className="block w-full cursor-zoom-in"
-                        aria-label="Open image in full size"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
@@ -396,17 +438,6 @@ export function TradeDetailModal({
                           alt={s.row.label}
                           className="max-h-[420px] w-full bg-ink-950/5 object-contain"
                           referrerPolicy="no-referrer"
-                          onError={() => {
-                            console.error("[ALLTRADES] <img> failed to load", {
-                              src: s.url,
-                              storagePath: s.row.storage_path,
-                            });
-                          }}
-                          onLoad={() => {
-                            console.log("[ALLTRADES] <img> loaded OK", {
-                              path: s.row.storage_path,
-                            });
-                          }}
                         />
                       </button>
                     </div>

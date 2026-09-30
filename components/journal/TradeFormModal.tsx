@@ -24,6 +24,7 @@ import {
   uploadScreenshot,
   deleteScreenshot,
 } from "@/lib/data/screenshots";
+import { useDailyAnalysesHistory } from "@/lib/data/daily-analysis-hooks";
 import {
   INSTRUMENTS,
   DIRECTIONS,
@@ -39,7 +40,30 @@ import {
   NEWS_EVENTS,
 } from "@/lib/constants";
 import type { Account, Trade } from "@/lib/types";
-import { emptyToNull, parseNumberOrNull, toDateKey } from "@/lib/utils";
+import {
+  emptyToNull,
+  formatDateMedium,
+  parseNumberOrNull,
+  toDateKey,
+} from "@/lib/utils";
+
+const MISTAKE_OPTIONS = [
+  "Entered too early",
+  "Entered late",
+  "FOMO",
+  "Revenge trade",
+  "Over-risked",
+  "Moved SL",
+  "Closed TP early",
+  "Ignored confirmation",
+  "Traded news",
+  "Took second trade",
+  "Ignored market structure",
+  "Poor RR",
+  "Wrong lot size",
+  "Emotional entry",
+  "No mistake",
+] as const;
 
 export interface TradeFormModalProps {
   open: boolean;
@@ -83,6 +107,9 @@ type FormState = {
   mistakes: string;
   emotions: string;
   notes: string;
+  what_went_well: string;
+  market_observation: string;
+  lesson: string;
 };
 
 function initialState(t?: Trade | null): FormState {
@@ -119,6 +146,9 @@ function initialState(t?: Trade | null): FormState {
     mistakes: t?.mistakes ?? "",
     emotions: t?.emotions ?? "",
     notes: t?.notes ?? "",
+    what_went_well: t?.what_went_well ?? "",
+    market_observation: t?.market_observation ?? "",
+    lesson: t?.lesson ?? "",
   };
 }
 
@@ -136,13 +166,24 @@ export function TradeFormModal({
 
   const [form, setForm] = React.useState<FormState>(() => initialState(editing));
   const [screenshots, setScreenshots] = React.useState<UploadedScreenshot[]>([]);
+  const [mistakeTags, setMistakeTags] = React.useState<string[]>(
+    editing?.mistake_tags ?? []
+  );
+  const [analysisId, setAnalysisId] = React.useState<string | null>(
+    editing?.daily_analysis_id ?? null
+  );
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [saving, setSaving] = React.useState(false);
   const [uploadStatus, setUploadStatus] = React.useState<string | null>(null);
 
+  // List recent daily analyses for the dropdown
+  const { data: analyses = [] } = useDailyAnalysesHistory(account.id, 30);
+
   React.useEffect(() => {
     if (!open) return;
     setForm(initialState(editing));
+    setMistakeTags(editing?.mistake_tags ?? []);
+    setAnalysisId(editing?.daily_analysis_id ?? null);
     setErrors({});
     setScreenshots([]);
     setUploadStatus(null);
@@ -249,6 +290,11 @@ export function TradeFormModal({
         mistakes: emptyToNull(form.mistakes),
         emotions: emptyToNull(form.emotions),
         notes: emptyToNull(form.notes),
+        what_went_well: emptyToNull(form.what_went_well),
+        market_observation: emptyToNull(form.market_observation),
+        lesson: emptyToNull(form.lesson),
+        mistake_tags: mistakeTags.length > 0 ? mistakeTags : null,
+        daily_analysis_id: analysisId,
       };
 
       let savedTrade: Trade;
@@ -258,90 +304,33 @@ export function TradeFormModal({
         savedTrade = await createTrade(supabase, user.id, payload);
       }
 
-      // -------- SCREENSHOT HANDLING (sequential, verbose, per-file) --------
       const pending = screenshots.filter((s) => s.file && !s.storagePath);
-
-      console.log("[ALLTRADES] trade save complete", {
-        tradeId: savedTrade.id,
-        pendingCount: pending.length,
-        allScreenshots: screenshots.map((s) => ({
-          hasFile: !!s.file,
-          hasStoragePath: !!s.storagePath,
-          fileName: s.file?.name,
-          fileSize: s.file?.size,
-          fileType: s.file?.type,
-          urlScheme: s.url.split(":")[0],
-        })),
-      });
-
       if (pending.length > 0) {
         setUploadStatus(
           `Uploading ${pending.length} image${pending.length > 1 ? "s" : ""}…`
         );
-
         for (let i = 0; i < pending.length; i++) {
           const s = pending[i];
-          const file = s.file as File;
-
           try {
-            console.log("[ALLTRADES] uploading file", {
-              index: i + 1,
-              name: file.name,
-              size: file.size,
-              type: file.type,
-            });
-
-            const { path, originalSize, compressedSize } =
-              await uploadScreenshot(
-                supabase,
-                user.id,
-                `trades/${savedTrade.id}`,
-                file
-              );
-
-            console.log("[ALLTRADES] storage upload OK", {
+            const { path } = await uploadScreenshot(
+              supabase,
+              user.id,
+              `trades/${savedTrade.id}`,
+              s.file as File
+            );
+            await addTradeScreenshot(
+              supabase,
+              user.id,
+              savedTrade.id,
               path,
-              originalSize,
-              compressedSize,
-            });
-
-            try {
-              const row = await addTradeScreenshot(
-                supabase,
-                user.id,
-                savedTrade.id,
-                path,
-                "Analysis"
-              );
-              console.log("[ALLTRADES] DB row inserted OK", row);
-            } catch (dbErr) {
-              console.error(
-                "[ALLTRADES] DB row insert FAILED - file is in Storage but not linked in DB",
-                dbErr
-              );
-              const msg =
-                dbErr instanceof Error ? dbErr.message : String(dbErr);
-              toast.warning("Screenshot uploaded but not linked", msg);
-            }
+              "Analysis"
+            );
           } catch (uploadErr) {
-            console.error("[ALLTRADES] storage upload FAILED", {
-              fileName: file.name,
-              fileSize: file.size,
-              fileType: file.type,
-              error: uploadErr,
-              errorMessage:
-                uploadErr instanceof Error
-                  ? uploadErr.message
-                  : String(uploadErr),
-            });
-            const msg =
-              uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
-            toast.error("Screenshot upload failed", msg);
+            console.error("[ALLTRADES] trade screenshot upload failed", uploadErr);
           }
         }
       }
 
-      // -------- REMOVALS --------
       if (isEdit && editing) {
         const existing = await listTradeScreenshots(supabase, editing.id);
         const keptIds = new Set(
@@ -399,7 +388,7 @@ export function TradeFormModal({
 
       {uploadStatus && (
         <div className="mb-4 rounded border border-brand-200 bg-brand-50 px-3 py-2 text-2xs text-brand-700">
-          {uploadStatus} Images are compressed automatically before upload.
+          {uploadStatus}
         </div>
       )}
 
@@ -494,6 +483,24 @@ export function TradeFormModal({
           </div>
         </Section>
 
+        <Section title="Linked Daily Analysis">
+          <Field label="Daily Analysis" htmlFor="daily_analysis_id"
+            hint="Link this trade to the exact analysis you made before it.">
+            <Select
+              id="daily_analysis_id"
+              value={analysisId ?? ""}
+              onChange={(e) => setAnalysisId(e.target.value || null)}
+              options={[
+                { value: "", label: "— None —" },
+                ...analyses.map((a) => ({
+                  value: a.id,
+                  label: `${formatDateMedium(new Date(a.analysis_date + "T00:00:00"))} · ${a.planned_direction ?? "—"} · ${a.status.replace(/_/g, " ")}`,
+                })),
+              ]}
+            />
+          </Field>
+        </Section>
+
         <Section title="Market & Setup">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Field label="Strategy" htmlFor="strategy">
@@ -571,6 +578,52 @@ export function TradeFormModal({
                 options={RESULTS as unknown as string[]}
                 placeholder="Select result" invalid={!!errors.result} />
             </Field>
+          </div>
+        </Section>
+
+        <Section title="Reflection">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="What I did well" htmlFor="what_went_well">
+              <Textarea id="what_went_well" rows={2} value={form.what_went_well}
+                onChange={(e) => set("what_went_well", e.target.value)} />
+            </Field>
+            <Field label="Market observation" htmlFor="market_observation">
+              <Textarea id="market_observation" rows={2} value={form.market_observation}
+                onChange={(e) => set("market_observation", e.target.value)} />
+            </Field>
+            <Field label="Lesson" htmlFor="lesson" className="sm:col-span-2">
+              <Textarea id="lesson" rows={2} value={form.lesson}
+                onChange={(e) => set("lesson", e.target.value)}
+                placeholder="What will I do differently next time?" />
+            </Field>
+          </div>
+        </Section>
+
+        <Section title="Mistake Tags">
+          <div className="flex flex-wrap gap-2">
+            {MISTAKE_OPTIONS.map((m) => {
+              const checked = mistakeTags.includes(m);
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => {
+                    setMistakeTags(
+                      checked
+                        ? mistakeTags.filter((x) => x !== m)
+                        : [...mistakeTags, m]
+                    );
+                  }}
+                  className={`rounded border px-2 py-1 text-3xs transition-colors ${
+                    checked
+                      ? "border-warn-border bg-warn-bg text-warn-text"
+                      : "border-border text-ink-600 hover:bg-surface-muted"
+                  }`}
+                >
+                  {m}
+                </button>
+              );
+            })}
           </div>
         </Section>
 

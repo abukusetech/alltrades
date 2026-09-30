@@ -74,10 +74,29 @@ export async function getTrade(
   return (data as Trade | null) ?? null;
 }
 
+/**
+ * TradeInsert — every existing field, PLUS the new Daily Analysis fields
+ * made optional so existing payloads keep compiling untouched.
+ */
 export type TradeInsert = Omit<
   Trade,
-  "id" | "user_id" | "created_at" | "updated_at"
->;
+  | "id"
+  | "user_id"
+  | "created_at"
+  | "updated_at"
+  | "what_went_well"
+  | "market_observation"
+  | "lesson"
+  | "mistake_tags"
+  | "daily_analysis_id"
+> & {
+  what_went_well?: string | null;
+  market_observation?: string | null;
+  lesson?: string | null;
+  mistake_tags?: string[] | null;
+  daily_analysis_id?: string | null;
+};
+
 export type TradeUpdate = Partial<TradeInsert>;
 
 export async function createTrade(

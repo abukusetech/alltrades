@@ -13,6 +13,7 @@ import { WeekNav } from "./WeekNav";
 import { WeekStats } from "./WeekStats";
 import { WeekSummaryLists } from "./WeekSummaryLists";
 import { WeekReviewForm } from "./WeekReviewForm";
+import { DailyAnalysisSummary } from "./DailyAnalysisSummary";
 import { endOfWeek, startOfWeek, toDateKey } from "@/lib/utils";
 
 export function WeeklyReviewClient() {
@@ -63,3 +64,4 @@ export function WeeklyReviewClient() {
     </div>
   );
 }
+
