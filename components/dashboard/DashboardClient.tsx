@@ -158,7 +158,11 @@ export function DashboardClient() {
               {/* --- PROFIT SPLIT + PAYOUT --- */}
               <div className="grid gap-4 lg:grid-cols-2">
                 <ProfitSplitCard split={split} />
-                <PayoutCountdownCard payout={payout} />
+                <PayoutCountdownCard
+                  payout={payout}
+                  consistencyScore={metrics.consistencyScore}
+                  maxConsistencyPercent={metrics.maxConsistencyPercent}
+                />
               </div>
 
               <div className="grid gap-4 lg:grid-cols-3">
@@ -184,4 +188,5 @@ export function DashboardClient() {
     </div>
   );
 }
+
 

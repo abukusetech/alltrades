@@ -111,8 +111,8 @@ export function pipsFromPrices(
   instrument = "EURUSD"
 ): number | null {
   if (entry === null || stop === null) return null;
-  const diff = Math.abs(entry - stop);
-  if (!Number.isFinite(diff)) return null;
+  if (!Number.isFinite(entry) || !Number.isFinite(stop)) return null;
+
   const pipSize =
     instrument === "USDJPY" || instrument === "GBPJPY"
       ? 0.01
@@ -121,7 +121,36 @@ export function pipsFromPrices(
         : instrument === "NAS100" || instrument === "US30" || instrument === "SPX500"
           ? 1
           : 0.0001;
+
+  // Detect pip-count-in-price-field: one value is a realistic price,
+  // the other is a small integer (0–500) that's clearly not a price.
+  const maxPriceForInstrument =
+    instrument === "USDJPY" || instrument === "GBPJPY"
+      ? 1000
+      : instrument === "XAUUSD / Gold"
+        ? 100000
+        : 10;
+
+  const entryLooksLikePrice = entry > maxPriceForInstrument * 0.05;
+  const stopLooksLikePrice = stop > maxPriceForInstrument * 0.05;
+
+  if (entryLooksLikePrice && !stopLooksLikePrice) return Math.abs(stop);
+  if (!entryLooksLikePrice && stopLooksLikePrice) return Math.abs(entry);
+  if (!entryLooksLikePrice && !stopLooksLikePrice) return null;
+
+  const diff = Math.abs(entry - stop);
   return diff / pipSize;
+}
+export function pipsToPrice(pips: number, instrument = "EURUSD"): number {
+  const pipSize =
+    instrument === "USDJPY" || instrument === "GBPJPY"
+      ? 0.01
+      : instrument === "XAUUSD / Gold"
+        ? 0.1
+        : instrument === "NAS100" || instrument === "US30" || instrument === "SPX500"
+          ? 1
+          : 0.0001;
+  return pips * pipSize;
 }
 
 export function computeRR(
@@ -133,7 +162,10 @@ export function computeRR(
   const risk = Math.abs(entry - sl);
   const reward = Math.abs(tp - entry);
   if (risk <= 0 || !Number.isFinite(risk) || !Number.isFinite(reward)) return null;
-  return reward / risk;
+  const raw = reward / risk;
+  if (!Number.isFinite(raw)) return null;
+  // Round to 2 decimals so 12/24 pips reads as exactly 2.00, not 1.9999998
+  return Number(raw.toFixed(2));
 }
 
 export function computeRiskAmount(
@@ -327,3 +359,6 @@ export function summarizeDailyAnalysisWeek(
     followedPlanPercent,
   };
 }
+
+
+

@@ -1,5 +1,5 @@
 ﻿import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Trade } from "@/lib/types";
+import type { Trade, RuleCheck } from "@/lib/types";
 
 export interface TradeFilters {
   accountId: string;
@@ -75,8 +75,8 @@ export async function getTrade(
 }
 
 /**
- * TradeInsert — every existing field, PLUS the new Daily Analysis fields
- * made optional so existing payloads keep compiling untouched.
+ * Every existing Trade field is required by default.
+ * Phase 9 fields are all optional so existing call sites keep compiling.
  */
 export type TradeInsert = Omit<
   Trade,
@@ -89,12 +89,38 @@ export type TradeInsert = Omit<
   | "lesson"
   | "mistake_tags"
   | "daily_analysis_id"
+  | "trade_plan_id"
+  | "entry_tags"
+  | "exit_tags"
+  | "management_tags"
+  | "well_tags"
+  | "emotion_before_tags"
+  | "emotion_after_tags"
+  | "market_tags"
+  | "lesson_tags"
+  | "rule_compliance"
+  | "rule_pass_count"
+  | "rule_total_count"
+  | "rule_pass"
 > & {
   what_went_well?: string | null;
   market_observation?: string | null;
   lesson?: string | null;
   mistake_tags?: string[] | null;
   daily_analysis_id?: string | null;
+  trade_plan_id?: string | null;
+  entry_tags?: string[] | null;
+  exit_tags?: string[] | null;
+  management_tags?: string[] | null;
+  well_tags?: string[] | null;
+  emotion_before_tags?: string[] | null;
+  emotion_after_tags?: string[] | null;
+  market_tags?: string[] | null;
+  lesson_tags?: string[] | null;
+  rule_compliance?: RuleCheck[] | null;
+  rule_pass_count?: number | null;
+  rule_total_count?: number | null;
+  rule_pass?: boolean | null;
 };
 
 export type TradeUpdate = Partial<TradeInsert>;

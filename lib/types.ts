@@ -33,6 +33,14 @@ export interface Account {
   max_daily_drawdown_percent: number;
   max_total_drawdown_percent: number;
   max_floating_loss_percent: number;
+  allowed_instrument: string | null;
+  min_sl_pips: number | null;
+  max_sl_pips: number | null;
+  min_rr: number | null;
+  max_daily_trades: number | null;
+  max_monthly_trades: number | null;
+  forbid_high_impact_news: boolean | null;
+  no_risk_increase_after_loss: boolean | null;
 
   created_at: string;
   updated_at: string;
@@ -85,6 +93,19 @@ export interface Trade {
   lesson: string | null;
   mistake_tags: string[] | null;
   daily_analysis_id: string | null;
+  trade_plan_id: string | null;
+  entry_tags: string[] | null;
+  exit_tags: string[] | null;
+  management_tags: string[] | null;
+  well_tags: string[] | null;
+  emotion_before_tags: string[] | null;
+  emotion_after_tags: string[] | null;
+  market_tags: string[] | null;
+  lesson_tags: string[] | null;
+  rule_compliance: RuleCheck[] | null;
+  rule_pass_count: number | null;
+  rule_total_count: number | null;
+  rule_pass: boolean | null;
 
   created_at: string;
   updated_at: string;
@@ -283,6 +304,14 @@ export interface DailyAnalysis {
   primary_direction: DirectionOption | null;
   confidence: ConfidenceOption | null;
   analysis_notes: string | null;
+  bias_tags: string[] | null;
+  structure_tags: string[] | null;
+  liquidity_tags: string[] | null;
+  setup_tags: string[] | null;
+  session_tags: string[] | null;
+  news_tags: string[] | null;
+  readiness_percent: number | null;
+  active_plan_id: string | null;
 
   tf_4h: TimeframeAnalysis | null;
   tf_1h: TimeframeAnalysis | null;
@@ -343,4 +372,82 @@ export interface DailyAnalysisScreenshot {
   timeframe: string;
   label: string | null;
   created_at: string;
+}
+
+
+// ============================================================
+// Phase 9 — Connected workflow types
+// ============================================================
+
+export interface TradePlan {
+  id: string;
+  user_id: string;
+  account_id: string;
+  daily_analysis_id: string | null;
+
+  plan_code: string | null;
+  plan_date: string;
+
+  direction: string | null;
+  instrument: string;
+
+  entry_price: number | null;
+  stop_loss: number | null;
+  take_profit: number | null;
+  sl_pips: number | null;
+  tp_pips: number | null;
+  risk_percent: number | null;
+  risk_amount: number | null;
+  rr: number | null;
+  expected_profit: number | null;
+
+  session: string | null;
+  setup_tags: string[] | null;
+  bias_tags: string[] | null;
+  structure_tags: string[] | null;
+  liquidity_tags: string[] | null;
+  news_tags: string[] | null;
+
+  confirmation_state: ChecklistItem[] | null;
+  confirmation_score: number | null;
+  readiness_percent: number | null;
+
+  plan_status:
+    | "DRAFT"
+    | "READY"
+    | "WAITING"
+    | "CONFIRMED"
+    | "INVALIDATED"
+    | "EXECUTED"
+    | "CANCELLED";
+
+  rule_compliance: RuleCheck[] | null;
+  rule_pass: boolean | null;
+
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RuleCheck {
+  key: string;
+  label: string;
+  passed: boolean;
+  detail?: string;
+}
+
+export interface AnalysisSnapshot {
+  id: string;
+  user_id: string;
+  trade_id: string;
+  daily_analysis_id: string | null;
+  trade_plan_id: string | null;
+  snapshot: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface TagGroup {
+  key: string;
+  label: string;
+  options: string[];
 }

@@ -53,6 +53,10 @@ export interface PayoutEligibility {
   eligibleOverall: boolean;
   expectedTraderShare: number;
   payoutEstimateDate: string;
+  cycleStartDate: string;
+  cycleEndDate: string;
+  businessDaysElapsed: number;
+  nextBusinessDayDate: string;
 }
 
 export interface Mistake {
@@ -246,70 +250,133 @@ export function computePayoutEligibility(
       eligibleOverall: false,
       expectedTraderShare: 0,
       payoutEstimateDate: "—",
+      cycleStartDate: "—",
+      cycleEndDate: "—",
+      businessDaysElapsed: 0,
+      nextBusinessDayDate: "—",
     };
   }
 
-  const minDays = payoutMinDays(account);
-  const monthStart = startOfMonth(referenceDate);
+  const minDays = Number(
+    (account as unknown as { payout_min_trading_days?: number }).payout_min_trading_days
+  ) || 10;
 
-  const monthTrades = trades.filter((t) => {
-    const d = new Date(t.trade_date + "T00:00:00");
-    return d >= monthStart;
-  });
+  // ---- Cycle start: earliest trade date, else account creation ----
+  const earliestTradeDate = trades.reduce<string | null>((acc, t) => {
+    if (!acc) return t.trade_date;
+    return t.trade_date < acc ? t.trade_date : acc;
+  }, null);
 
-  const tradingDays = new Set(monthTrades.map((t) => t.trade_date));
-  const tradingDaysCount = tradingDays.size;
+  const cycleStartKey =
+    earliestTradeDate ?? account.created_at.slice(0, 10);
+
+  // Unique trading dates since cycle start
+  const uniqueTradeDates = Array.from(
+    new Set(
+      trades
+        .filter((t) => t.trade_date >= cycleStartKey)
+        .map((t) => t.trade_date)
+    )
+  ).sort();
+
+  const tradingDaysCount = uniqueTradeDates.length;
   const daysRemaining = Math.max(minDays - tradingDaysCount, 0);
   const eligibleByDays = tradingDaysCount >= minDays;
 
-  const grossProfit = monthTrades.reduce((s, t) => s + (Number(t.profit_loss) || 0), 0);
+  // ---- Business-day cycle end (Mon–Fri only) ----
+  // Walk forward from the cycle start date, counting business days only.
+  // The payout becomes eligible on the Nth business day (inclusive).
+  function addBusinessDays(startIso: string, n: number): Date {
+    const d = new Date(startIso + "T00:00:00");
+    let added = 0;
+    while (added < n) {
+      d.setDate(d.getDate() + 1);
+      const dow = d.getDay();
+      if (dow !== 0 && dow !== 6) added++;
+    }
+    return d;
+  }
+
+  // Count business days already elapsed between cycleStart and today
+  function businessDaysBetween(startIso: string, end: Date): number {
+    const start = new Date(startIso + "T00:00:00");
+    const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+    if (endDay <= start) return 0;
+    let count = 0;
+    const cursor = new Date(start);
+    while (cursor < endDay) {
+      cursor.setDate(cursor.getDate() + 1);
+      const dow = cursor.getDay();
+      if (dow !== 0 && dow !== 6) count++;
+    }
+    return count;
+  }
+
+  const businessDaysElapsed = businessDaysBetween(
+    cycleStartKey,
+    referenceDate
+  );
+  const businessDaysRemaining = Math.max(
+    minDays - businessDaysElapsed,
+    0
+  );
+
+  const cycleEndDate = addBusinessDays(cycleStartKey, minDays);
+  const cycleEndLabel = cycleEndDate.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+  const cycleStartLabel = new Date(cycleStartKey + "T00:00:00").toLocaleDateString(
+    "en-GB",
+    { day: "numeric", month: "short", year: "numeric" }
+  );
+
+  // ---- Profit target ----
+  const totalPnL = trades.reduce((s, t) => s + (Number(t.profit_loss) || 0), 0);
   const targetPct = Number(account.withdrawal_target_percent) || 4;
   const target = (Number(account.starting_capital) || 0) * (targetPct / 100);
-  const eligibleByProfit = grossProfit >= target;
+  const eligibleByProfit = totalPnL >= target;
 
-  // Consistency
+  // ---- Consistency (20% rule) ----
   const daily = new Map<string, number>();
-  for (const t of monthTrades) {
-    daily.set(t.trade_date, (daily.get(t.trade_date) ?? 0) + (Number(t.profit_loss) || 0));
+  for (const t of trades) {
+    daily.set(
+      t.trade_date,
+      (daily.get(t.trade_date) ?? 0) + (Number(t.profit_loss) || 0)
+    );
   }
   const days = Array.from(daily.values());
   const totalProfit = days.reduce((s, v) => s + Math.max(v, 0), 0);
   const biggestDay = days.reduce((s, v) => Math.max(s, v), 0);
-  const consistencyScore = totalProfit > 0 ? (biggestDay / totalProfit) * 100 : 0;
+  const consistencyScore =
+    totalProfit > 0 ? (biggestDay / totalProfit) * 100 : 0;
   const maxConsistency = Number(account.max_consistency_percent) || 20;
   const eligibleByConsistency = consistencyScore <= maxConsistency;
 
   const split = computeProfitSplit(account, trades, withdrawals);
 
-  // Estimate payout date = today + daysRemaining (business-ish, simple weekday skip)
-  const estimate = new Date(referenceDate);
-  let toAdd = daysRemaining;
-  while (toAdd > 0) {
-    estimate.setDate(estimate.getDate() + 1);
-    const dow = estimate.getDay();
-    if (dow !== 0 && dow !== 6) toAdd--;
-  }
-
   return {
     tradingDaysThisMonth: tradingDaysCount,
     requiredTradingDays: minDays,
-    daysRemaining,
-    eligibleByDays,
+    daysRemaining: businessDaysRemaining,
+    eligibleByDays: eligibleByDays && businessDaysElapsed >= minDays,
     eligibleByProfit,
     eligibleByConsistency,
-    eligibleOverall: eligibleByDays && eligibleByProfit && eligibleByConsistency,
+    eligibleOverall:
+      eligibleByDays &&
+      businessDaysElapsed >= minDays &&
+      eligibleByProfit &&
+      eligibleByConsistency,
     expectedTraderShare: split.traderShare,
-    payoutEstimateDate: estimate.toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    }),
+    payoutEstimateDate: cycleEndLabel,
+    cycleStartDate: cycleStartLabel,
+    cycleEndDate: cycleEndLabel,
+    businessDaysElapsed,
+    nextBusinessDayDate: cycleEndLabel,
   };
-}
-
-// ---------- Mistake detection ----------
-
-export function detectMistakes(
+}export function detectMistakes(
   account: Account | null,
   trades: Trade[]
 ): Mistake[] {
@@ -527,5 +594,7 @@ export function computePerformanceScore(
 
   return { total: Math.round(total), breakdown };
 }
+
+
 
 

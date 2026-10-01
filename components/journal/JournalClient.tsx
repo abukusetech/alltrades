@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Plus, Search, BookOpen, X } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useCurrentAccount } from "@/components/layout/AppShell";
 import { useTrades, useWithdrawals, useRevalidateAccount } from "@/lib/data/hooks";
 import { computeAccountMetrics } from "@/lib/calc";
@@ -19,7 +20,7 @@ import {
 import { TradeFormModal } from "./TradeFormModal";
 import { TradeDetailModal } from "./TradeDetailModal";
 import { INSTRUMENTS, RESULTS, STRATEGIES } from "@/lib/constants";
-import type { Trade } from "@/lib/types";
+import type { Trade, DailyAnalysis } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 
 type SortKey = "trade_date" | "profit_loss" | "instrument" | "result";
@@ -40,6 +41,8 @@ export function JournalClient() {
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Trade | null>(null);
   const [detail, setDetail] = React.useState<Trade | null>(null);
+  const [prefillAnalysis, setPrefillAnalysis] = React.useState<DailyAnalysis | null>(null);
+  const searchParams = useSearchParams();
 
   const metrics = React.useMemo(
     () => computeAccountMetrics(currentAccount, trades, withdrawals),
@@ -194,11 +197,15 @@ export function JournalClient() {
         <>
           <TradeFormModal
             open={formOpen}
-            onClose={() => setFormOpen(false)}
+            onClose={() => {
+              setFormOpen(false);
+              setPrefillAnalysis(null);
+            }}
             onSaved={revalidate}
             account={currentAccount}
             weeklyTradeCount={metrics.weeklyTradeCount}
             editing={editing}
+            prefillAnalysis={prefillAnalysis}
           />
           <TradeDetailModal
             trade={detail}
@@ -230,3 +237,7 @@ function fmt(v: number | null | undefined): string {
   if (v === null || v === undefined || Number.isNaN(v)) return "—";
   return String(v);
 }
+
+
+
+

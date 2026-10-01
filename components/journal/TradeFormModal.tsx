@@ -8,6 +8,7 @@ import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
+import { TagPicker } from "@/components/ui/TagPicker";
 import {
   ScreenshotUploader,
   type UploadedScreenshot,
@@ -25,6 +26,9 @@ import {
   deleteScreenshot,
 } from "@/lib/data/screenshots";
 import { useDailyAnalysesHistory } from "@/lib/data/daily-analysis-hooks";
+import { getTradePlanByAnalysis } from "@/lib/data/trade-plans";
+import { createSnapshot, buildSnapshotPayload } from "@/lib/data/analysis-snapshots";
+import { computeAndPersistRules } from "@/lib/data/rule-checks";
 import {
   INSTRUMENTS,
   DIRECTIONS,
@@ -39,31 +43,23 @@ import {
   LIQUIDITY_TAKEN_OPTIONS,
   NEWS_EVENTS,
 } from "@/lib/constants";
-import type { Account, Trade } from "@/lib/types";
+import {
+  ENTRY_REASON_TAGS,
+  EXIT_REASON_TAGS,
+  MANAGEMENT_TAGS,
+  WELL_TAGS,
+  MISTAKE_TAGS,
+  EMOTION_TAGS,
+  MARKET_TAGS,
+  LESSON_TAGS,
+} from "@/lib/tags";
+import type { Account, Trade, DailyAnalysis } from "@/lib/types";
 import {
   emptyToNull,
   formatDateMedium,
   parseNumberOrNull,
   toDateKey,
 } from "@/lib/utils";
-
-const MISTAKE_OPTIONS = [
-  "Entered too early",
-  "Entered late",
-  "FOMO",
-  "Revenge trade",
-  "Over-risked",
-  "Moved SL",
-  "Closed TP early",
-  "Ignored confirmation",
-  "Traded news",
-  "Took second trade",
-  "Ignored market structure",
-  "Poor RR",
-  "Wrong lot size",
-  "Emotional entry",
-  "No mistake",
-] as const;
 
 export interface TradeFormModalProps {
   open: boolean;
@@ -72,6 +68,7 @@ export interface TradeFormModalProps {
   account: Account;
   weeklyTradeCount: number;
   editing?: Trade | null;
+  prefillAnalysis?: DailyAnalysis | null;
 }
 
 type FormState = {
@@ -152,6 +149,54 @@ function initialState(t?: Trade | null): FormState {
   };
 }
 
+function prefillFromAnalysis(form: FormState, analysis: DailyAnalysis): FormState {
+  const next = { ...form };
+  if (!next.instrument && analysis.instrument) next.instrument = analysis.instrument;
+  if (!next.direction && analysis.planned_direction) {
+    next.direction =
+      analysis.planned_direction === "BUY"
+        ? "Buy"
+        : analysis.planned_direction === "SELL"
+          ? "Sell"
+          : "";
+  }
+  if (!next.entry_price && analysis.planned_entry !== null) {
+    next.entry_price = String(analysis.planned_entry);
+  }
+  if (!next.stop_loss && analysis.planned_stop_loss !== null) {
+    next.stop_loss = String(analysis.planned_stop_loss);
+  }
+  if (!next.take_profit && analysis.planned_take_profit !== null) {
+    next.take_profit = String(analysis.planned_take_profit);
+  }
+  if (!next.risk_amount && analysis.planned_risk_amount !== null) {
+    next.risk_amount = String(analysis.planned_risk_amount);
+  }
+  if (!next.risk_reward && analysis.planned_rr !== null) {
+    next.risk_reward = `1 : ${analysis.planned_rr.toFixed(0)}`;
+  }
+  if (!next.strategy && analysis.setup_tags && analysis.setup_tags.length > 0) {
+    next.strategy = analysis.setup_tags[0];
+  }
+  if (!next.market_bias && analysis.higher_timeframe_bias) {
+    next.market_bias = analysis.higher_timeframe_bias;
+  }
+  if (!next.timeframe && analysis.tf_15m) {
+    next.timeframe = "15 Minutes";
+  }
+  if (!next.session && analysis.session_tags && analysis.session_tags.length > 0) {
+    const s = analysis.session_tags[0];
+    if (s === "London/NY overlap") next.session = "London";
+    else if (["Asian", "London", "New York"].includes(s)) next.session = s;
+  }
+  if (!next.news_event && analysis.news_major) {
+    next.news_event = "High Impact News";
+  } else if (!next.news_event && !analysis.news_major) {
+    next.news_event = "No Major News";
+  }
+  return next;
+}
+
 export function TradeFormModal({
   open,
   onClose,
@@ -159,6 +204,7 @@ export function TradeFormModal({
   account,
   weeklyTradeCount,
   editing,
+  prefillAnalysis,
 }: TradeFormModalProps) {
   const supabase = React.useMemo(() => createClient(), []);
   const toast = useToast();
@@ -166,27 +212,47 @@ export function TradeFormModal({
 
   const [form, setForm] = React.useState<FormState>(() => initialState(editing));
   const [screenshots, setScreenshots] = React.useState<UploadedScreenshot[]>([]);
-  const [mistakeTags, setMistakeTags] = React.useState<string[]>(
-    editing?.mistake_tags ?? []
-  );
-  const [analysisId, setAnalysisId] = React.useState<string | null>(
-    editing?.daily_analysis_id ?? null
-  );
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [saving, setSaving] = React.useState(false);
   const [uploadStatus, setUploadStatus] = React.useState<string | null>(null);
+  const originallyLoadedIds = React.useRef<Set<string>>(new Set());
+  const [analysisId, setAnalysisId] = React.useState<string | null>(
+    editing?.daily_analysis_id ?? prefillAnalysis?.id ?? null
+  );
 
-  // List recent daily analyses for the dropdown
+  const [entryTags, setEntryTags] = React.useState<string[]>(editing?.entry_tags ?? []);
+  const [exitTags, setExitTags] = React.useState<string[]>(editing?.exit_tags ?? []);
+  const [mgmtTags, setMgmtTags] = React.useState<string[]>(editing?.management_tags ?? []);
+  const [wellTags, setWellTags] = React.useState<string[]>(editing?.well_tags ?? []);
+  const [mistakeTags, setMistakeTags] = React.useState<string[]>(editing?.mistake_tags ?? []);
+  const [emoBefore, setEmoBefore] = React.useState<string[]>(editing?.emotion_before_tags ?? []);
+  const [emoAfter, setEmoAfter] = React.useState<string[]>(editing?.emotion_after_tags ?? []);
+  const [marketTags, setMarketTags] = React.useState<string[]>(editing?.market_tags ?? []);
+  const [lessonTags, setLessonTags] = React.useState<string[]>(editing?.lesson_tags ?? []);
+
   const { data: analyses = [] } = useDailyAnalysesHistory(account.id, 30);
 
   React.useEffect(() => {
     if (!open) return;
-    setForm(initialState(editing));
-    setMistakeTags(editing?.mistake_tags ?? []);
-    setAnalysisId(editing?.daily_analysis_id ?? null);
+    let nextForm = initialState(editing);
+    if (!editing && prefillAnalysis) {
+      nextForm = prefillFromAnalysis(nextForm, prefillAnalysis);
+    }
+    setForm(nextForm);
     setErrors({});
     setScreenshots([]);
     setUploadStatus(null);
+    setAnalysisId(editing?.daily_analysis_id ?? prefillAnalysis?.id ?? null);
+    setEntryTags(editing?.entry_tags ?? []);
+    setExitTags(editing?.exit_tags ?? []);
+    setMgmtTags(editing?.management_tags ?? []);
+    setWellTags(editing?.well_tags ?? []);
+    setMistakeTags(editing?.mistake_tags ?? []);
+    setEmoBefore(editing?.emotion_before_tags ?? []);
+    setEmoAfter(editing?.emotion_after_tags ?? []);
+    setMarketTags(editing?.market_tags ?? []);
+    setLessonTags(editing?.lesson_tags ?? []);
+
     if (editing) {
       (async () => {
         try {
@@ -202,13 +268,17 @@ export function TradeFormModal({
               } as UploadedScreenshot;
             })
           );
-          setScreenshots(withUrls.filter((s) => !!s.url));
+          const loaded = withUrls.filter((s) => !!s.url);
+          setScreenshots(loaded);
+          originallyLoadedIds.current = new Set(
+            loaded.filter((s) => s.id).map((s) => s.id as string)
+          );
         } catch {
           // best effort
         }
       })();
     }
-  }, [open, editing, supabase]);
+  }, [open, editing, prefillAnalysis, supabase]);
 
   const weeklyLimitReached =
     !isEdit && weeklyTradeCount >= account.max_weekly_trades;
@@ -256,6 +326,16 @@ export function TradeFormModal({
         return;
       }
 
+      let linkedPlanId: string | null = null;
+      if (analysisId) {
+        try {
+          const plan = await getTradePlanByAnalysis(supabase, analysisId);
+          linkedPlanId = plan?.id ?? null;
+        } catch {
+          linkedPlanId = null;
+        }
+      }
+
       const payload = {
         account_id: account.id,
         trade_date: form.trade_date,
@@ -294,7 +374,16 @@ export function TradeFormModal({
         market_observation: emptyToNull(form.market_observation),
         lesson: emptyToNull(form.lesson),
         mistake_tags: mistakeTags.length > 0 ? mistakeTags : null,
+        entry_tags: entryTags.length > 0 ? entryTags : null,
+        exit_tags: exitTags.length > 0 ? exitTags : null,
+        management_tags: mgmtTags.length > 0 ? mgmtTags : null,
+        well_tags: wellTags.length > 0 ? wellTags : null,
+        emotion_before_tags: emoBefore.length > 0 ? emoBefore : null,
+        emotion_after_tags: emoAfter.length > 0 ? emoAfter : null,
+        market_tags: marketTags.length > 0 ? marketTags : null,
+        lesson_tags: lessonTags.length > 0 ? lessonTags : null,
         daily_analysis_id: analysisId,
+        trade_plan_id: linkedPlanId,
       };
 
       let savedTrade: Trade;
@@ -304,20 +393,71 @@ export function TradeFormModal({
         savedTrade = await createTrade(supabase, user.id, payload);
       }
 
+      if (!isEdit && analysisId) {
+        try {
+          const linkedAnalysis = analyses.find((a) => a.id === analysisId);
+          if (linkedAnalysis) {
+            const plan = linkedPlanId
+              ? await getTradePlanByAnalysis(supabase, analysisId)
+              : null;
+            const snapshotPayload = buildSnapshotPayload(linkedAnalysis, plan);
+            await createSnapshot(
+              supabase,
+              user.id,
+              savedTrade.id,
+              analysisId,
+              linkedPlanId,
+              snapshotPayload
+            );
+          }
+        } catch (snapErr) {
+          console.warn("[ALLTRADES] snapshot creation failed", snapErr);
+        }
+      }
+
+      try {
+        const { listTrades } = await import("@/lib/data/trades");
+        const all = await listTrades(supabase, { accountId: account.id });
+        await computeAndPersistRules(supabase, savedTrade, account, all);
+      } catch (ruleErr) {
+        console.warn("[ALLTRADES] rule compliance compute failed", ruleErr);
+      }
+
+      // ---------- SCREENSHOTS ----------
       const pending = screenshots.filter((s) => s.file && !s.storagePath);
+      console.log("[ALLTRADES] trade save complete", {
+        tradeId: savedTrade.id,
+        userId: user.id,
+        pendingCount: pending.length,
+      });
+
       if (pending.length > 0) {
         setUploadStatus(
           `Uploading ${pending.length} image${pending.length > 1 ? "s" : ""}…`
         );
+
+        let uploadedCount = 0;
+        let failedCount = 0;
+        let lastError: string | null = null;
+
         for (let i = 0; i < pending.length; i++) {
           const s = pending[i];
           try {
+            console.log("[ALLTRADES] uploading file", {
+              index: i + 1,
+              name: s.file?.name,
+              size: s.file?.size,
+              type: s.file?.type,
+            });
+
             const { path } = await uploadScreenshot(
               supabase,
               user.id,
               `trades/${savedTrade.id}`,
               s.file as File
             );
+            console.log("[ALLTRADES] storage upload OK", { path });
+
             await addTradeScreenshot(
               supabase,
               user.id,
@@ -325,24 +465,57 @@ export function TradeFormModal({
               path,
               "Analysis"
             );
+            uploadedCount++;
           } catch (uploadErr) {
+            failedCount++;
+            lastError =
+              uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
             console.error("[ALLTRADES] trade screenshot upload failed", uploadErr);
           }
         }
+
+        console.log("[ALLTRADES] screenshot summary", {
+          uploadedCount,
+          failedCount,
+          lastError,
+        });
+
+        if (uploadedCount > 0) {
+          toast.success(
+            `${uploadedCount} screenshot${uploadedCount > 1 ? "s" : ""} saved to this trade`
+          );
+        }
+        if (failedCount > 0) {
+          toast.error(
+            `${failedCount} screenshot${failedCount > 1 ? "s" : ""} could not be saved`,
+            lastError ?? "See browser console for the exact error"
+          );
+        }
       }
 
-      if (isEdit && editing) {
-        const existing = await listTradeScreenshots(supabase, editing.id);
-        const keptIds = new Set(
+      // Only remove screenshots the user explicitly took out of the form.
+      if (isEdit && editing && originallyLoadedIds.current.size > 0) {
+        const currentIds = new Set(
           screenshots.filter((s) => s.id).map((s) => s.id as string)
         );
-        const toRemove = existing.filter((r) => !keptIds.has(r.id));
-        Promise.all(
-          toRemove.map(async (r) => {
-            await deleteScreenshot(supabase, r.storage_path).catch(() => {});
-            await removeTradeScreenshot(supabase, r.id).catch(() => {});
-          })
+        const toRemove = Array.from(originallyLoadedIds.current).filter(
+          (id) => !currentIds.has(id)
         );
+        if (toRemove.length > 0) {
+          const pathByIid = new Map<string, string>();
+          screenshots.forEach((s) => {
+            if (s.id && s.storagePath) pathByIid.set(s.id, s.storagePath);
+          });
+          await Promise.all(
+            toRemove.map(async (id) => {
+              const path = pathByIid.get(id);
+              if (path) {
+                await deleteScreenshot(supabase, path).catch(() => {});
+              }
+              await removeTradeScreenshot(supabase, id).catch(() => {});
+            })
+          );
+        }
       }
 
       toast.success(
@@ -366,7 +539,11 @@ export function TradeFormModal({
       open={open}
       onClose={onClose}
       title={isEdit ? "Edit Trade" : "New Trade"}
-      description="Record the complete setup, execution and psychology."
+      description={
+        prefillAnalysis && !isEdit
+          ? `Prefilled from Daily Analysis on ${formatDateMedium(new Date(prefillAnalysis.analysis_date + "T00:00:00"))}`
+          : "Record the complete setup, execution and psychology."
+      }
       size="xl"
       footer={
         <>
@@ -546,32 +723,135 @@ export function TradeFormModal({
           </div>
         </Section>
 
-        <Section title="Execution & Psychology">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Entry Reason" htmlFor="entry_reason">
+        <Section title="Entry">
+          <TagPicker
+            label="Entry reason tags"
+            options={ENTRY_REASON_TAGS}
+            value={entryTags}
+            onChange={setEntryTags}
+            allowCustom
+          />
+          <div className="mt-3">
+            <Field label="Why did I actually enter?" htmlFor="entry_reason">
               <Textarea id="entry_reason" rows={2} value={form.entry_reason}
                 onChange={(e) => set("entry_reason", e.target.value)} />
             </Field>
-            <Field label="Exit Reason" htmlFor="exit_reason">
+          </div>
+        </Section>
+
+        <Section title="Exit & Management">
+          <div className="space-y-4">
+            <TagPicker
+              label="Exit reason tags"
+              options={EXIT_REASON_TAGS}
+              value={exitTags}
+              onChange={setExitTags}
+              allowCustom
+            />
+            <Field label="Exit notes" htmlFor="exit_reason">
               <Textarea id="exit_reason" rows={2} value={form.exit_reason}
                 onChange={(e) => set("exit_reason", e.target.value)} />
             </Field>
-            <Field label="Management" htmlFor="management">
+            <TagPicker
+              label="Management tags"
+              options={MANAGEMENT_TAGS}
+              value={mgmtTags}
+              onChange={setMgmtTags}
+              allowCustom
+            />
+            <Field label="Management notes" htmlFor="management">
               <Textarea id="management" rows={2} value={form.management}
                 onChange={(e) => set("management", e.target.value)} />
             </Field>
-            <Field label="Mistakes" htmlFor="mistakes">
+          </div>
+        </Section>
+
+        <Section title="What I Did Well">
+          <TagPicker
+            label="Well-executed tags"
+            options={WELL_TAGS}
+            value={wellTags}
+            onChange={setWellTags}
+            allowCustom
+          />
+          <div className="mt-3">
+            <Field label="Notes" htmlFor="what_went_well">
+              <Textarea id="what_went_well" rows={2} value={form.what_went_well}
+                onChange={(e) => set("what_went_well", e.target.value)} />
+            </Field>
+          </div>
+        </Section>
+
+        <Section title="Mistakes">
+          <TagPicker
+            label="Mistake tags"
+            options={MISTAKE_TAGS}
+            value={mistakeTags}
+            onChange={setMistakeTags}
+            allowCustom
+          />
+          <div className="mt-3">
+            <Field label="Mistake notes" htmlFor="mistakes">
               <Textarea id="mistakes" rows={2} value={form.mistakes}
                 onChange={(e) => set("mistakes", e.target.value)} />
             </Field>
-            <Field label="Emotions" htmlFor="emotions">
+          </div>
+        </Section>
+
+        <Section title="Emotions">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <TagPicker
+              label="Before trade"
+              options={EMOTION_TAGS}
+              value={emoBefore}
+              onChange={setEmoBefore}
+            />
+            <TagPicker
+              label="After trade"
+              options={EMOTION_TAGS}
+              value={emoAfter}
+              onChange={setEmoAfter}
+            />
+          </div>
+          <div className="mt-3">
+            <Field label="Emotion notes" htmlFor="emotions">
               <Textarea id="emotions" rows={2} value={form.emotions}
                 onChange={(e) => set("emotions", e.target.value)} />
             </Field>
-            <Field label="Notes" htmlFor="notes">
-              <Textarea id="notes" rows={2} value={form.notes}
-                onChange={(e) => set("notes", e.target.value)} />
+          </div>
+        </Section>
+
+        <Section title="Market Observation">
+          <TagPicker
+            label="Market condition tags"
+            options={MARKET_TAGS}
+            value={marketTags}
+            onChange={setMarketTags}
+            allowCustom
+          />
+          <div className="mt-3">
+            <Field label="What did the market teach me?" htmlFor="market_observation">
+              <Textarea id="market_observation" rows={2} value={form.market_observation}
+                onChange={(e) => set("market_observation", e.target.value)} />
             </Field>
+          </div>
+        </Section>
+
+        <Section title="Lesson Learned">
+          <TagPicker
+            label="Lesson tags"
+            options={LESSON_TAGS}
+            value={lessonTags}
+            onChange={setLessonTags}
+            allowCustom
+          />
+          <div className="mt-3">
+            <Field label="Lesson notes" htmlFor="lesson">
+              <Textarea id="lesson" rows={2} value={form.lesson}
+                onChange={(e) => set("lesson", e.target.value)} />
+            </Field>
+          </div>
+          <div className="mt-3">
             <Field label="Result" htmlFor="result" required error={errors.result}>
               <Select id="result" value={form.result}
                 onChange={(e) => set("result", e.target.value)}
@@ -581,50 +861,11 @@ export function TradeFormModal({
           </div>
         </Section>
 
-        <Section title="Reflection">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="What I did well" htmlFor="what_went_well">
-              <Textarea id="what_went_well" rows={2} value={form.what_went_well}
-                onChange={(e) => set("what_went_well", e.target.value)} />
-            </Field>
-            <Field label="Market observation" htmlFor="market_observation">
-              <Textarea id="market_observation" rows={2} value={form.market_observation}
-                onChange={(e) => set("market_observation", e.target.value)} />
-            </Field>
-            <Field label="Lesson" htmlFor="lesson" className="sm:col-span-2">
-              <Textarea id="lesson" rows={2} value={form.lesson}
-                onChange={(e) => set("lesson", e.target.value)}
-                placeholder="What will I do differently next time?" />
-            </Field>
-          </div>
-        </Section>
-
-        <Section title="Mistake Tags">
-          <div className="flex flex-wrap gap-2">
-            {MISTAKE_OPTIONS.map((m) => {
-              const checked = mistakeTags.includes(m);
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => {
-                    setMistakeTags(
-                      checked
-                        ? mistakeTags.filter((x) => x !== m)
-                        : [...mistakeTags, m]
-                    );
-                  }}
-                  className={`rounded border px-2 py-1 text-3xs transition-colors ${
-                    checked
-                      ? "border-warn-border bg-warn-bg text-warn-text"
-                      : "border-border text-ink-600 hover:bg-surface-muted"
-                  }`}
-                >
-                  {m}
-                </button>
-              );
-            })}
-          </div>
+        <Section title="Notes">
+          <Field label="General notes" htmlFor="notes">
+            <Textarea id="notes" rows={2} value={form.notes}
+              onChange={(e) => set("notes", e.target.value)} />
+          </Field>
         </Section>
 
         <Section title="Screenshots">
@@ -657,3 +898,4 @@ function Section({
     </section>
   );
 }
+

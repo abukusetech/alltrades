@@ -44,10 +44,35 @@ export async function getDailyAnalysisById(
   return (data as DailyAnalysis | null) ?? null;
 }
 
+/**
+ * DailyAnalysisInsert — Phase 9 fields are optional so existing
+ * call sites keep compiling without change.
+ */
 export type DailyAnalysisInsert = Omit<
   DailyAnalysis,
-  "id" | "user_id" | "created_at" | "updated_at"
->;
+  | "id"
+  | "user_id"
+  | "created_at"
+  | "updated_at"
+  | "bias_tags"
+  | "structure_tags"
+  | "liquidity_tags"
+  | "setup_tags"
+  | "session_tags"
+  | "news_tags"
+  | "readiness_percent"
+  | "active_plan_id"
+> & {
+  bias_tags?: string[] | null;
+  structure_tags?: string[] | null;
+  liquidity_tags?: string[] | null;
+  setup_tags?: string[] | null;
+  session_tags?: string[] | null;
+  news_tags?: string[] | null;
+  readiness_percent?: number | null;
+  active_plan_id?: string | null;
+};
+
 export type DailyAnalysisUpdate = Partial<DailyAnalysisInsert>;
 
 export async function createDailyAnalysis(

@@ -39,6 +39,18 @@ import {
 } from "@/lib/daily-analysis-calc";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { AccountHeader } from "@/components/layout/AccountHeader";
+import { ReadinessPanel } from "./ReadinessPanel";
+import { LinkedTradeBanner } from "./LinkedTradeBanner";
+import { TagPicker } from "@/components/ui/TagPicker";
+import {
+  BIAS_TAGS,
+  STRUCTURE_TAGS,
+  LIQUIDITY_TAGS,
+  SETUP_TAGS,
+  SESSION_TAGS,
+  NEWS_TAGS,
+} from "@/lib/tags";
+import { computePipelineStage } from "@/lib/readiness";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -335,11 +347,14 @@ const [date, setDate] = React.useState(
 
   const rr = React.useMemo(() => {
     if (!analysis) return null;
-    return computeRR(
+    const raw = computeRR(
       analysis.planned_entry,
       analysis.planned_stop_loss,
       analysis.planned_take_profit
     );
+    if (raw === null || !Number.isFinite(raw)) return null;
+    // Round to 2 decimals so floating point never makes 2.00 look like 1.9999
+    return Number(raw.toFixed(2));
   }, [analysis]);
 
   const riskAmount = React.useMemo(() => {
@@ -354,6 +369,32 @@ const [date, setDate] = React.useState(
     () => computeExpectedProfit(riskAmount, rr),
     [riskAmount, rr]
   );
+
+  // Persist derived SL pips / RR / expected profit back to the analysis
+  // so Trade Check reads the same numbers.
+  React.useEffect(() => {
+    if (!analysis) return;
+    const nextSl = slPips !== null ? Number(slPips.toFixed(1)) : null;
+    const nextRr = rr !== null ? Number(rr.toFixed(2)) : null;
+    const nextProfit = expectedProfit > 0 ? Number(expectedProfit.toFixed(2)) : null;
+    const nextRisk = riskAmount > 0 ? Number(riskAmount.toFixed(2)) : null;
+
+    const changed =
+      analysis.planned_sl_pips !== nextSl ||
+      analysis.planned_rr !== nextRr ||
+      analysis.planned_expected_profit !== nextProfit ||
+      analysis.planned_risk_amount !== nextRisk;
+
+    if (changed) {
+      update({
+        planned_sl_pips: nextSl,
+        planned_rr: nextRr,
+        planned_expected_profit: nextProfit,
+        planned_risk_amount: nextRisk,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slPips, rr, expectedProfit, riskAmount, analysis?.id]);
 
   const checklist = analysis?.confirmation_checklist ?? DEFAULT_CHECKLIST;
   const confirmScore = React.useMemo(
@@ -456,6 +497,9 @@ const [date, setDate] = React.useState(
             <Button variant="outline" size="sm" onClick={goToday}>
               Today
             </Button>
+            <Link href={`/trade-check?analysis=${analysis.id}`}>
+              <Button variant="outline" size="sm">Open Trade Check</Button>
+            </Link>
             <Link href="/journal">
               <Button size="sm">Journal</Button>
             </Link>
@@ -467,6 +511,58 @@ const [date, setDate] = React.useState(
         account={currentAccount}
         currentCapital={metrics.currentCapital}
       />
+
+      {/* LINKED TRADE */}
+      <LinkedTradeBanner
+        accountId={currentAccountId}
+        dailyAnalysisId={analysis.id}
+        tradePlanId={analysis.active_plan_id ?? null}
+      />
+
+      {/* PIPELINE */}
+      <Card>
+        <CardBody className="py-3">
+          <div className="flex flex-wrap items-center gap-2 text-3xs">
+            {(
+              [
+                "ANALYSIS",
+                "CONFIRMATION",
+                "TRADE_CHECK",
+                "READY",
+                "TRADE_TAKEN",
+              ] as const
+            ).map((step, i) => {
+              const stages = [
+                "ANALYSIS",
+                "CONFIRMATION",
+                "TRADE_CHECK",
+                "READY",
+                "TRADE_TAKEN",
+              ];
+              const current = computePipelineStage(analysis, false);
+              const currentIdx = stages.indexOf(current);
+              const stepIdx = i;
+              const active = stepIdx <= currentIdx;
+              return (
+                <span key={step} className="flex items-center gap-2">
+                  <span
+                    className={`rounded border px-2 py-0.5 ${
+                      active
+                        ? "border-brand-600 bg-brand-50 font-medium text-brand-700"
+                        : "border-border text-ink-500"
+                    }`}
+                  >
+                    {step.replace(/_/g, " ")}
+                  </span>
+                  {i < stages.length - 1 && (
+                    <span className="text-ink-300">→</span>
+                  )}
+                </span>
+              );
+            })}
+          </div>
+        </CardBody>
+      </Card>
 
       {/* HEADER SUMMARY */}
       <Card>
@@ -490,75 +586,119 @@ const [date, setDate] = React.useState(
         </CardBody>
       </Card>
 
+      {/* READINESS */}
+      <ReadinessPanel analysis={analysis} />
+
       {/* MARKET BIAS */}
       <Card>
         <CardHeader>
           <CardTitle>Market Bias</CardTitle>
         </CardHeader>
-        <CardBody className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="Higher Timeframe Bias" htmlFor="htf_bias">
-            <Select
-              id="htf_bias"
-              value={analysis.higher_timeframe_bias ?? ""}
-              onChange={(e) =>
-                update({
-                  higher_timeframe_bias: (e.target.value || null) as DailyAnalysis["higher_timeframe_bias"],
-                })
-              }
-              options={["Bullish", "Bearish", "Neutral"]}
-              placeholder="Select"
-            />
-          </Field>
-          <Field label="Market Structure" htmlFor="market_structure">
-            <Select
-              id="market_structure"
-              value={analysis.market_structure ?? ""}
-              onChange={(e) =>
-                update({
-                  market_structure: (e.target.value || null) as DailyAnalysis["market_structure"],
-                })
-              }
-              options={["Bullish", "Bearish", "Ranging", "Unclear"]}
-              placeholder="Select"
-            />
-          </Field>
-          <Field label="Primary Direction" htmlFor="primary_direction">
-            <Select
-              id="primary_direction"
-              value={analysis.primary_direction ?? ""}
-              onChange={(e) =>
-                update({
-                  primary_direction: (e.target.value || null) as DirectionOption | null,
-                })
-              }
-              options={["BUY", "SELL", "WAIT"]}
-              placeholder="Select"
-            />
-          </Field>
-          <Field label="Confidence" htmlFor="confidence">
-            <Select
-              id="confidence"
-              value={analysis.confidence ?? ""}
-              onChange={(e) =>
-                update({
-                  confidence: (e.target.value || null) as DailyAnalysis["confidence"],
-                })
-              }
-              options={["High", "Medium", "Low"]}
-              placeholder="Select"
-            />
-          </Field>
-          <div className="sm:col-span-2 lg:col-span-4">
-            <Field label="Analysis Notes" htmlFor="analysis_notes">
-              <Textarea
-                id="analysis_notes"
-                rows={3}
-                value={analysis.analysis_notes ?? ""}
-                onChange={(e) => update({ analysis_notes: e.target.value })}
-                placeholder="EURUSD is bullish on the higher timeframe. Price is approaching a previous liquidity area. I will wait for confirmation before considering a buy."
+        <CardBody className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Field label="Higher Timeframe Bias" htmlFor="htf_bias">
+              <Select
+                id="htf_bias"
+                value={analysis.higher_timeframe_bias ?? ""}
+                onChange={(e) =>
+                  update({
+                    higher_timeframe_bias: (e.target.value || null) as DailyAnalysis["higher_timeframe_bias"],
+                  })
+                }
+                options={["Bullish", "Bearish", "Neutral"]}
+                placeholder="Select"
+              />
+            </Field>
+            <Field label="Market Structure" htmlFor="market_structure">
+              <Select
+                id="market_structure"
+                value={analysis.market_structure ?? ""}
+                onChange={(e) =>
+                  update({
+                    market_structure: (e.target.value || null) as DailyAnalysis["market_structure"],
+                  })
+                }
+                options={["Bullish", "Bearish", "Ranging", "Unclear"]}
+                placeholder="Select"
+              />
+            </Field>
+            <Field label="Primary Direction" htmlFor="primary_direction">
+              <Select
+                id="primary_direction"
+                value={analysis.primary_direction ?? ""}
+                onChange={(e) =>
+                  update({
+                    primary_direction: (e.target.value || null) as DirectionOption | null,
+                  })
+                }
+                options={["BUY", "SELL", "WAIT"]}
+                placeholder="Select"
+              />
+            </Field>
+            <Field label="Confidence" htmlFor="confidence">
+              <Select
+                id="confidence"
+                value={analysis.confidence ?? ""}
+                onChange={(e) =>
+                  update({
+                    confidence: (e.target.value || null) as DailyAnalysis["confidence"],
+                  })
+                }
+                options={["High", "Medium", "Low"]}
+                placeholder="Select"
               />
             </Field>
           </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <TagPicker
+              label="Bias tags"
+              options={BIAS_TAGS}
+              value={analysis.bias_tags ?? []}
+              onChange={(v) => update({ bias_tags: v })}
+            />
+            <TagPicker
+              label="Structure tags"
+              options={STRUCTURE_TAGS}
+              value={analysis.structure_tags ?? []}
+              onChange={(v) => update({ structure_tags: v })}
+            />
+            <TagPicker
+              label="Liquidity tags"
+              options={LIQUIDITY_TAGS}
+              value={analysis.liquidity_tags ?? []}
+              onChange={(v) => update({ liquidity_tags: v })}
+            />
+            <TagPicker
+              label="Setup tags"
+              options={SETUP_TAGS}
+              value={analysis.setup_tags ?? []}
+              onChange={(v) => update({ setup_tags: v })}
+              allowCustom
+            />
+            <TagPicker
+              label="Session tags"
+              options={SESSION_TAGS}
+              value={analysis.session_tags ?? []}
+              onChange={(v) => update({ session_tags: v })}
+            />
+            <TagPicker
+              label="News tags"
+              options={NEWS_TAGS}
+              value={analysis.news_tags ?? []}
+              onChange={(v) => update({ news_tags: v })}
+            />
+          </div>
+
+          <Field label="Analysis Notes" htmlFor="analysis_notes">
+            <Textarea
+              id="analysis_notes"
+              rows={3}
+              value={analysis.analysis_notes ?? ""}
+              onChange={(e) => update({ analysis_notes: e.target.value })}
+              placeholder="EURUSD is bullish on the higher timeframe. Price is approaching a previous liquidity area. I will wait for confirmation before considering a buy."
+            />
+          </Field>
         </CardBody>
       </Card>
 
@@ -936,7 +1076,58 @@ function TradePlanCard({
   riskAmount: number;
   expectedProfit: number;
 }) {
-  const rrWarning = rr !== null && rr < 2;
+  const rrWarning = rr !== null && rr < 1.995;
+  const instrument = analysis.instrument || "EURUSD";
+
+  // Helper to derive a price from a pip entry, based on entry price + direction
+  function priceFromPips(pips: number, isSL: boolean) {
+    const entry = analysis.planned_entry;
+    if (entry === null) return null;
+    const direction = analysis.planned_direction;
+    // SELL: SL is above entry, TP is below entry
+    // BUY:  SL is below entry, TP is above entry
+    const sign =
+      direction === "SELL"
+        ? isSL
+          ? 1
+          : -1
+        : isSL
+          ? -1
+          : 1;
+    const pipSize =
+      instrument === "USDJPY" || instrument === "GBPJPY"
+        ? 0.01
+        : instrument === "XAUUSD / Gold"
+          ? 0.1
+          : instrument === "NAS100" || instrument === "US30" || instrument === "SPX500"
+            ? 1
+            : 0.0001;
+    return Number((entry + sign * pips * pipSize).toFixed(5));
+  }
+
+  const [slPipsInput, setSlPipsInput] = React.useState("");
+  const [tpPipsInput, setTpPipsInput] = React.useState("");
+
+  // When the user types a pip value, compute the price
+  function applySLPips() {
+    const pips = Number(slPipsInput);
+    if (!Number.isFinite(pips) || pips <= 0) return;
+    const price = priceFromPips(pips, true);
+    if (price !== null) {
+      onUpdate({ planned_stop_loss: price, planned_sl_pips: pips });
+    }
+    setSlPipsInput("");
+  }
+  function applyTPPips() {
+    const pips = Number(tpPipsInput);
+    if (!Number.isFinite(pips) || pips <= 0) return;
+    const price = priceFromPips(pips, false);
+    if (price !== null) {
+      onUpdate({ planned_take_profit: price, planned_risk_percent: analysis.planned_risk_percent ?? 0.25 });
+    }
+    setTpPipsInput("");
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -956,31 +1147,14 @@ function TradePlanCard({
               placeholder="Select"
             />
           </Field>
-          <Field label="Entry price" htmlFor="planned_entry">
+          <Field label="Entry price" htmlFor="planned_entry" hint="e.g. 1.1720">
             <Input
               id="planned_entry"
               type="number"
               step="any"
               value={analysis.planned_entry ?? ""}
               onChange={(e) => onUpdate({ planned_entry: parseNumberOrNull(e.target.value) })}
-            />
-          </Field>
-          <Field label="Stop loss" htmlFor="planned_sl">
-            <Input
-              id="planned_sl"
-              type="number"
-              step="any"
-              value={analysis.planned_stop_loss ?? ""}
-              onChange={(e) => onUpdate({ planned_stop_loss: parseNumberOrNull(e.target.value) })}
-            />
-          </Field>
-          <Field label="Take profit" htmlFor="planned_tp">
-            <Input
-              id="planned_tp"
-              type="number"
-              step="any"
-              value={analysis.planned_take_profit ?? ""}
-              onChange={(e) => onUpdate({ planned_take_profit: parseNumberOrNull(e.target.value) })}
+              placeholder="1.0000"
             />
           </Field>
           <Field label="Risk %" htmlFor="planned_risk">
@@ -997,9 +1171,64 @@ function TradePlanCard({
           </Field>
         </div>
 
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Stop loss (price)" htmlFor="planned_sl" hint="Full price, e.g. 1.1708">
+            <Input
+              id="planned_sl"
+              type="number"
+              step="any"
+              value={analysis.planned_stop_loss ?? ""}
+              onChange={(e) => onUpdate({ planned_stop_loss: parseNumberOrNull(e.target.value) })}
+              placeholder="1.0000"
+            />
+          </Field>
+          <Field label="Or enter SL in pips" htmlFor="planned_sl_pips_input" hint="e.g. 12">
+            <div className="flex items-center gap-2">
+              <Input
+                id="planned_sl_pips_input"
+                type="number"
+                step="1"
+                value={slPipsInput}
+                onChange={(e) => setSlPipsInput(e.target.value)}
+                placeholder="12"
+              />
+              <Button variant="outline" size="sm" type="button" onClick={applySLPips}>
+                Apply
+              </Button>
+            </div>
+          </Field>
+
+          <Field label="Take profit (price)" htmlFor="planned_tp" hint="Full price, e.g. 1.1744">
+            <Input
+              id="planned_tp"
+              type="number"
+              step="any"
+              value={analysis.planned_take_profit ?? ""}
+              onChange={(e) => onUpdate({ planned_take_profit: parseNumberOrNull(e.target.value) })}
+              placeholder="1.0000"
+            />
+          </Field>
+          <Field label="Or enter TP in pips" htmlFor="planned_tp_pips_input" hint="e.g. 24">
+            <div className="flex items-center gap-2">
+              <Input
+                id="planned_tp_pips_input"
+                type="number"
+                step="1"
+                value={tpPipsInput}
+                onChange={(e) => setTpPipsInput(e.target.value)}
+                placeholder="24"
+              />
+              <Button variant="outline" size="sm" type="button" onClick={applyTPPips}>
+                Apply
+              </Button>
+            </div>
+          </Field>
+        </div>
+
         <div className="grid grid-cols-2 gap-4 rounded border border-border bg-surface-soft p-3 sm:grid-cols-4">
-          <CalcStat label="SL distance" value={slPips !== null ? `${slPips} pips` : "—"} />
-          <CalcStat            label="Risk"
+          <CalcStat label="SL distance" value={slPips !== null ? `${slPips.toFixed(1)} pips` : "—"} />
+          <CalcStat
+            label="Risk"
             value={`${analysis.planned_risk_percent?.toFixed(2) ?? "—"}% = ${formatCurrency(riskAmount)}`}
           />
           <CalcStat
@@ -1019,11 +1248,18 @@ function TradePlanCard({
             ⚠️ RR below plan — minimum required is 1:2.
           </div>
         )}
+
+        {(analysis.planned_sl_pips === null || analysis.planned_rr === null) &&
+          analysis.planned_entry !== null &&
+          analysis.planned_stop_loss !== null && (
+            <div className="rounded border border-border bg-surface-soft px-3 py-2 text-3xs text-ink-500">
+              Tip: enter the full price in SL/TP fields (e.g. 1.1708), or use the pip inputs above. Pips like <code>10</code> are not valid prices.
+            </div>
+          )}
       </CardBody>
     </Card>
   );
 }
-
 function CalcStat({
   label,
   value,
@@ -1469,4 +1705,14 @@ function HistoryCard({
     </Card>
   );
 }
+
+
+
+
+
+
+
+
+
+
 

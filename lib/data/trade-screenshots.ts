@@ -14,6 +14,10 @@ export async function listTradeScreenshots(
     console.error("[ALLTRADES] listTradeScreenshots failed", error);
     throw error;
   }
+  console.log("[ALLTRADES] listTradeScreenshots", {
+    tradeId,
+    count: data?.length ?? 0,
+  });
   return (data ?? []) as TradeScreenshot[];
 }
 
@@ -44,7 +48,7 @@ export async function addTradeScreenshot(
     label,
   };
 
-  console.log("[ALLTRADES] addTradeScreenshot -> payload", insertPayload);
+  console.log("[ALLTRADES] addTradeScreenshot → payload", insertPayload);
 
   const { data, error } = await supabase
     .from("trade_screenshots")
@@ -67,7 +71,7 @@ export async function addTradeScreenshot(
     );
   }
 
-  console.log("[ALLTRADES] addTradeScreenshot inserted", data);
+  console.log("[ALLTRADES] addTradeScreenshot ✓ inserted", data);
   return data as TradeScreenshot;
 }
 
