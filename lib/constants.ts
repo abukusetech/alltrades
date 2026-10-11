@@ -155,7 +155,7 @@ export const WITHDRAWAL_STATUSES = [
 ] as const;
 
 export const SCREENSHOT_MAX_BYTES = 6 * 1024 * 1024;
-export const SCREENSHOT_MAX_COUNT = 6;
+export const SCREENSHOT_MAX_COUNT = 10;
 export const SCREENSHOT_ACCEPTED_TYPES = [
   "image/png",
   "image/jpeg",
@@ -163,3 +163,4 @@ export const SCREENSHOT_ACCEPTED_TYPES = [
 ];
 
 export const NOT_SPECIFIED = "Not specified";
+

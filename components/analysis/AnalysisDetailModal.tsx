@@ -100,7 +100,7 @@ export function AnalysisDetailModal({
     return () => {
       cancelled = true;
     };
-  }, [open, analysis, supabase]);
+  }, [open, analysis?.id, analysis?.updated_at, supabase]);
 
   async function onDelete() {
     if (!analysis) return;
@@ -303,7 +303,7 @@ export function AnalysisDetailModal({
                         <img
                           src={s.url}
                           alt={`Chart ${i + 1}`}
-                          className="max-h-[420px] w-full bg-ink-950/5 object-contain"
+                          className="max-h-[55vh] w-full bg-ink-950/5 object-contain sm:max-h-[420px]"
                           loading="lazy"
                           onError={(e) => {
                             // eslint-disable-next-line no-console
@@ -371,3 +371,5 @@ function LongForm({ title, value }: { title: string; value: string | null }) {
     </div>
   );
 }
+
+

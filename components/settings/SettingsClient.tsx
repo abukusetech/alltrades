@@ -1,13 +1,16 @@
 ﻿"use client";
 
-import { Plus } from "lucide-react";
+import * as React from "react";
+import { Plus, Settings as SettingsIcon } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useCurrentAccount } from "@/components/layout/AppShell";
 import { AccountForm } from "./AccountForm";
 import { AccountList } from "./AccountList";
 import { SystemRulesCard } from "./SystemRulesCard";
 import { DeleteAccountCard } from "./DeleteAccountCard";
+import { AccountingSettingsCard } from "./AccountingSettingsCard";
 
 export function SettingsClient() {
   const { accounts, currentAccount } = useCurrentAccount();
@@ -16,7 +19,7 @@ export function SettingsClient() {
     <div className="space-y-6">
       <PageHeader
         title="Settings"
-        subtitle="Create accounts and manage your trading accounts."
+        subtitle="Create accounts, manage trading accounts, and configure accounting."
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -35,14 +38,15 @@ export function SettingsClient() {
             <CardHeader>
               <CardTitle>Your Accounts</CardTitle>
               <span className="text-2xs text-ink-500">
-                {accounts.length}{" "}
-                {accounts.length === 1 ? "account" : "accounts"}
+                {accounts.length} {accounts.length === 1 ? "account" : "accounts"}
               </span>
             </CardHeader>
             <CardBody>
               <AccountList accounts={accounts} />
             </CardBody>
           </Card>
+
+          <AccountingSettingsCard />
 
           <DeleteAccountCard />
         </div>

@@ -14,6 +14,8 @@ import {
   Plus,
 } from "lucide-react";
 import { useCurrentAccount } from "@/components/layout/AppShell";
+import { useFormDraft } from "@/lib/hooks/useFormDraft";
+import { SaveStatus } from "@/components/ui/SaveStatus";
 import { createClient } from "@/lib/supabase/client";
 import { useDailyAnalysis, useDailyAnalysesHistory } from "@/lib/data/daily-analysis-hooks";
 import {
@@ -143,6 +145,35 @@ const [date, setDate] = React.useState(
     "idle" | "saving" | "saved" | "error"
   >("idle");
 
+  // ────────────────────────────────────────────────────────────────
+  // Local draft persistence — survives accidental refresh / tab close.
+  // Keyed by user + date so nothing leaks between records or users.
+  // ────────────────────────────────────────────────────────────────
+  const draft = useFormDraft<DailyAnalysis>({
+    userId: currentAccount?.user_id ?? null,
+    recordKey: `daily-analysis.${date}`,
+    serverSavedAt: analysis?.updated_at
+      ? new Date(analysis.updated_at).getTime()
+      : null,
+    ttlMs: 8 * 60 * 60 * 1000,
+    disabled: !currentAccount,
+  });
+
+  const [showDraftPrompt, setShowDraftPrompt] = React.useState(false);
+
+  React.useEffect(() => {
+    if (draft.pendingDraft) setShowDraftPrompt(true);
+  }, [draft.pendingDraft]);
+
+  const draftConsumedRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!draft.pendingDraft || !analysis) return;
+    const key = analysis.id;
+    if (draftConsumedRef.current === key) return;
+    draftConsumedRef.current = key;
+    setShowDraftPrompt(true);
+  }, [draft.pendingDraft, analysis]);
+
   // Other data for the header
   const { data: trades = [] } = useTrades(currentAccountId);
   const { data: withdrawals = [] } = useWithdrawals(currentAccountId);
@@ -152,12 +183,34 @@ const [date, setDate] = React.useState(
   );
 
   // ---- Bootstrap ----
+  // Seed the local working copy from the server ONLY when the record ID
+  // changes. Never re-sync on refetch — that would overwrite the user's
+  // in-flight edits.
+  // Cancel pending save timer when the date changes — prevents a stale
+  // save from writing an old day's draft into the new day's record.
+  React.useEffect(() => {
+    return () => {
+      if (saveTimer.current) {
+        window.clearTimeout(saveTimer.current);
+        saveTimer.current = null;
+      }
+    };
+  }, [date]);
+
+  const seededIdRef = React.useRef<string | null>(null);
   React.useEffect(() => {
     if (!existing) {
-      setAnalysis(null);
+      // Only clear when we genuinely have no record for this date
+      if (seededIdRef.current !== null) {
+        setAnalysis(null);
+        seededIdRef.current = null;
+      }
       return;
     }
+    if (seededIdRef.current === existing.id) return;
+    // New record loaded (different day or first open) — seed once.
     setAnalysis(existing);
+    seededIdRef.current = existing.id;
   }, [existing]);
 
   // Debounced save
@@ -231,7 +284,10 @@ const [date, setDate] = React.useState(
 
         lastSerialized.current = JSON.stringify(a);
         setSaveState("saved");
-        void mutate();
+        draft.clearDraft();
+        // Do not call mutate() here. It triggers an SWR revalidate that
+        // can race with the user's next keystroke. The local state is the
+        // source of truth while editing; SWR refreshes on next mount.
       } catch (e) {
         console.error("[ALLTRADES] daily analysis save failed", e);
         setSaveState("error");
@@ -246,6 +302,9 @@ const [date, setDate] = React.useState(
       setAnalysis((prev) => {
         if (!prev) return prev;
         const next = { ...prev, ...patch };
+        // 1. Write a local draft immediately (so refresh / close is safe)
+        draft.writeDraft(next);
+        // 2. Schedule the debounced server save
         if (saveTimer.current) window.clearTimeout(saveTimer.current);
         saveTimer.current = window.setTimeout(() => {
           void persist(next);
@@ -253,9 +312,29 @@ const [date, setDate] = React.useState(
         return next;
       });
     },
-    [persist]
+    [persist, draft]
   );
 
+  // ────────────────────────────────────────────────────────────
+  // Draft restore / dismiss handlers.
+  // Declared after update()/persist() so they can reference them.
+  // ────────────────────────────────────────────────────────────
+  const handleRestoreDraft = React.useCallback(() => {
+    const restored = draft.acceptDraft();
+    if (restored) {
+      setAnalysis((prev) => (prev ? { ...prev, ...restored } : prev));
+      if (saveTimer.current) window.clearTimeout(saveTimer.current);
+      saveTimer.current = window.setTimeout(() => {
+        void persist(restored);
+      }, 300);
+    }
+    setShowDraftPrompt(false);
+  }, [draft, persist]);
+
+  const handleDismissDraft = React.useCallback(() => {
+    draft.dismissDraft();
+    setShowDraftPrompt(false);
+  }, [draft]);
   // ---- Create a blank analysis for today ----
   const createBlank = React.useCallback(async () => {
     if (!currentAccountId) return;
@@ -488,6 +567,25 @@ const [date, setDate] = React.useState(
         actions={
           <div className="flex items-center gap-2">
             <SaveIndicator state={saveState} />
+            {showDraftPrompt && (
+              <span className="inline-flex items-center gap-1.5 rounded border border-warn-border bg-warn-bg px-2 py-1 text-3xs text-warn-text">
+                Unsaved draft found
+                <button
+                  type="button"
+                  onClick={handleRestoreDraft}
+                  className="rounded border border-warn-border bg-white px-1.5 py-0.5 text-3xs font-medium text-warn-text hover:bg-warn-bg"
+                >
+                  Restore
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDismissDraft}
+                  className="text-3xs underline decoration-warn-text/60 hover:decoration-warn-text"
+                >
+                  Dismiss
+                </button>
+              </span>
+            )}
             <Button variant="outline" size="sm" onClick={() => shiftDay(-1)}>
               <ChevronLeft className="h-3.5 w-3.5" />
             </Button>
@@ -1705,6 +1803,15 @@ function HistoryCard({
     </Card>
   );
 }
+
+
+
+
+
+
+
+
+
 
 
 

@@ -451,3 +451,208 @@ export interface TagGroup {
   label: string;
   options: string[];
 }
+
+
+// ============================================================
+// Phase 11A — Accounting & Fund Management types
+// ============================================================
+
+export type AccountingFundKey =
+  | "business_cash"
+  | "account_fund"
+  | "personal_savings"
+  | "emergency_fund"
+  | "business_operating"
+  | "personal_spending"
+  | "trading_fees"
+  | "trading_income"
+  | "other_income"
+  | "business_expenses"
+  | "personal_expenses";
+
+export type AccountingFundKind =
+  | "asset"
+  | "income"
+  | "expense"
+  | "liability"
+  | "equity";
+
+export interface AccountingFund {
+  id: string;
+  user_id: string;
+  key: AccountingFundKey;
+  label: string;
+  kind: AccountingFundKind;
+  sort_order: number;
+  is_system: boolean;
+  created_at: string;
+}
+
+export type AccountingTransactionKind =
+  | "withdrawal_received"
+  | "allocation"
+  | "account_purchase"
+  | "transfer"
+  | "expense"
+  | "income"
+  | "savings_deposit"
+  | "refund"
+  | "correction";
+
+export interface AccountingTransaction {
+  id: string;
+  user_id: string;
+  occurred_on: string;
+  kind: AccountingTransactionKind;
+  description: string;
+  amount: number;
+  currency: string;
+  exchange_rate_to_usd: number;
+  amount_usd: number;
+  reference: string | null;
+  notes: string | null;
+  linked_withdrawal_id: string | null;
+  linked_purchase_id: string | null;
+  reversed_by: string | null;
+  reverses: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AccountingLedgerEntry {
+  id: string;
+  user_id: string;
+  transaction_id: string;
+  fund_key: AccountingFundKey;
+  direction: "debit" | "credit";
+  amount: number;
+  created_at: string;
+}
+
+export type AccountingWithdrawalStatus =
+  | "draft"
+  | "requested"
+  | "approved"
+  | "paid"
+  | "rejected"
+  | "cancelled";
+
+export interface AccountingWithdrawal {
+  id: string;
+  user_id: string;
+  prop_firm: string;
+  account_size: number | null;
+  request_date: string;
+  gross_profit_eligible: number | null;
+  gross_requested: number;
+  trader_share_percent: number;
+  firm_share_percent: number;
+  expected_net_payout: number | null;
+  fee_amount: number;
+  actual_net_received: number | null;
+  received_date: string | null;
+  status: AccountingWithdrawalStatus;
+  reference: string | null;
+  notes: string | null;
+  currency: string;
+  exchange_rate_to_usd: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AccountingAllocation {
+  id: string;
+  user_id: string;
+  withdrawal_id: string;
+  created_on: string;
+  total_amount: number;
+  account_fund_percent: number;
+  savings_percent: number;
+  business_percent: number;
+  account_fund_amount: number;
+  savings_amount: number;
+  business_amount: number;
+  confirmed: boolean;
+  created_at: string;
+}
+
+export type AccountingPurchaseStatus =
+  | "planned"
+  | "purchased"
+  | "active"
+  | "payout_eligible"
+  | "completed"
+  | "lost"
+  | "archived";
+
+export interface AccountingPurchase {
+  id: string;
+  user_id: string;
+  size: number;
+  price: number;
+  purchased_on: string | null;
+  status: AccountingPurchaseStatus;
+  linked_account_id: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type AccountingGoalStatus =
+  | "active"
+  | "achieved"
+  | "paused"
+  | "cancelled";
+
+export interface AccountingGoal {
+  id: string;
+  user_id: string;
+  name: string;
+  target_amount: number;
+  currency: string;
+  exchange_rate_to_usd: number;
+  target_amount_usd: number;
+  linked_fund_key: AccountingFundKey;
+  target_date: string | null;
+  priority: number;
+  status: AccountingGoalStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AccountingSettings {
+  user_id: string;
+  base_currency: string;
+  default_prop_firm: string;
+  default_trader_share_percent: number;
+  account_fund_percent: number;
+  savings_percent: number;
+  business_percent: number;
+  minimum_cash_reserve: number;
+  usd_kes_rate: number;
+  account_prices: Record<string, number>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FundBalance {
+  fund_key: AccountingFundKey;
+  label: string;
+  kind: AccountingFundKind;
+  balance: number;
+}
+
+export interface AccountingSnapshot {
+  total_withdrawals_received: number;
+  total_profit_after_split: number;
+  total_allocated_to_accounts: number;
+  total_personal_savings: number;
+  business_cash_balance: number;
+  total_expenses: number;
+  total_personal_transfers: number;
+  total_account_purchase_cost: number;
+  emergency_reserve: number;
+  net_cash_flow: number;
+  balances: FundBalance[];
+}

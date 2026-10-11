@@ -19,6 +19,7 @@ import {
   Layers,
   ScrollText,
   Sunrise,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +45,7 @@ const ACCOUNT: NavItem[] = [
   { href: "/consistency", label: "Consistency", icon: ShieldCheck },
   { href: "/rules", label: "Rules", icon: ScrollText },
   { href: "/withdrawals", label: "Withdrawals", icon: ArrowUpRight },
+  { href: "/accounting", label: "Accounting", icon: Wallet },
   { href: "/portfolio", label: "Portfolio", icon: Layers },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

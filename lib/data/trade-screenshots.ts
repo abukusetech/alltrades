@@ -14,10 +14,6 @@ export async function listTradeScreenshots(
     console.error("[ALLTRADES] listTradeScreenshots failed", error);
     throw error;
   }
-  console.log("[ALLTRADES] listTradeScreenshots", {
-    tradeId,
-    count: data?.length ?? 0,
-  });
   return (data ?? []) as TradeScreenshot[];
 }
 
@@ -41,37 +37,36 @@ export async function addTradeScreenshot(
   storagePath: string,
   label: "Analysis" | "Before Trade" | "After Trade" = "Analysis"
 ): Promise<TradeScreenshot> {
-  const insertPayload = {
-    user_id: userId,
-    trade_id: tradeId,
-    storage_path: storagePath,
-    label,
-  };
-
-  console.log("[ALLTRADES] addTradeScreenshot → payload", insertPayload);
-
   const { data, error } = await supabase
     .from("trade_screenshots")
-    .insert(insertPayload)
+    .insert({
+      user_id: userId,
+      trade_id: tradeId,
+      storage_path: storagePath,
+      label,
+    })
     .select("*")
     .single();
+  if (error) throw error;
 
-  if (error) {
-    console.error("[ALLTRADES] addTradeScreenshot FAILED", {
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      code: error.code,
-      payload: insertPayload,
+  // Read-back verification: confirms the row is actually visible to the
+  // authenticated user under RLS. Catches silent insert failures.
+  const { data: verify, error: verifyErr } = await supabase
+    .from("trade_screenshots")
+    .select("id")
+    .eq("id", (data as TradeScreenshot).id)
+    .maybeSingle();
+
+  if (verifyErr || !verify) {
+    console.error("[ALLTRADES] insert read-back failed", {
+      insertedId: (data as TradeScreenshot).id,
+      verifyErr,
     });
     throw new Error(
-      `addTradeScreenshot failed [${error.code ?? "no-code"}]: ${error.message}` +
-        (error.details ? ` — ${error.details}` : "") +
-        (error.hint ? ` (hint: ${error.hint})` : "")
+      "Screenshot row was inserted but could not be read back. Check RLS on trade_screenshots."
     );
   }
 
-  console.log("[ALLTRADES] addTradeScreenshot ✓ inserted", data);
   return data as TradeScreenshot;
 }
 

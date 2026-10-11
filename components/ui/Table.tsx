@@ -9,8 +9,10 @@ export function TableWrap({
     <div
       className={cn(
         "w-full overflow-x-auto rounded-lg border border-border bg-white",
+        "-webkit-overflow-scrolling-touch",
         className
       )}
+      style={{ WebkitOverflowScrolling: "touch" }}
       {...props}
     />
   );
@@ -22,7 +24,7 @@ export function Table({
 }: React.TableHTMLAttributes<HTMLTableElement>) {
   return (
     <table
-      className={cn("w-full border-collapse text-sm", className)}
+      className={cn("w-full min-w-[640px] border-collapse text-sm", className)}
       {...props}
     />
   );
@@ -34,7 +36,10 @@ export function THead({
 }: React.HTMLAttributes<HTMLTableSectionElement>) {
   return (
     <thead
-      className={cn("bg-surface-muted text-2xs uppercase tracking-wide text-ink-500", className)}
+      className={cn(
+        "bg-surface-muted text-2xs uppercase tracking-wide text-ink-500",
+        className
+      )}
       {...props}
     />
   );
@@ -44,7 +49,9 @@ export function TBody({
   className,
   ...props
 }: React.HTMLAttributes<HTMLTableSectionElement>) {
-  return <tbody className={cn("divide-y divide-border", className)} {...props} />;
+  return (
+    <tbody className={cn("divide-y divide-border", className)} {...props} />
+  );
 }
 
 export function TR({
@@ -66,7 +73,7 @@ export function TH({
   return (
     <th
       className={cn(
-        "whitespace-nowrap px-4 py-2.5 text-left font-medium",
+        "whitespace-nowrap px-3 py-2.5 text-left font-medium sm:px-4",
         className
       )}
       {...props}
@@ -80,7 +87,10 @@ export function TD({
 }: React.TdHTMLAttributes<HTMLTableCellElement>) {
   return (
     <td
-      className={cn("whitespace-nowrap px-4 py-3 text-sm text-ink-800", className)}
+      className={cn(
+        "whitespace-nowrap px-3 py-2.5 text-sm text-ink-800 sm:px-4 sm:py-3",
+        className
+      )}
       {...props}
     />
   );

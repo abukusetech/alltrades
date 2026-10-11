@@ -825,7 +825,7 @@ function ScreenshotsTab({
               <img
                 src={s.url}
                 alt={s.row.label}
-                className="max-h-[420px] w-full bg-ink-950/5 object-contain"
+                className="max-h-[55vh] w-full bg-ink-950/5 object-contain sm:max-h-[420px]"
                 referrerPolicy="no-referrer"
               />
             </button>
@@ -924,4 +924,5 @@ function LongForm({ title, value }: { title: string; value: string | null }) {
     </div>
   );
 }
+
 

@@ -114,11 +114,11 @@ export function ScreenshotUploader({
 
       {hint && <p className="mt-1 text-3xs text-ink-500">{hint}</p>}
 
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         {value.map((s, i) => (
           <div
             key={(s.id ?? s.storagePath ?? s.url) + i}
-            className="group relative h-20 w-24 overflow-hidden rounded border border-border bg-ink-100"
+            className="group relative h-20 w-full overflow-hidden rounded border border-border bg-ink-100 sm:w-24"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -145,7 +145,7 @@ export function ScreenshotUploader({
             onClick={onPick}
             disabled={busy}
             className={cn(
-              "flex h-20 w-24 flex-col items-center justify-center gap-1 rounded border border-dashed border-border-strong bg-surface-soft text-3xs text-ink-500 transition-colors hover:border-ink-400 hover:text-ink-700",
+              "flex h-20 w-full flex-col items-center justify-center gap-1 rounded border border-dashed border-border-strong bg-surface-soft text-3xs text-ink-500 transition-colors hover:border-ink-400 hover:text-ink-700 sm:w-24",
               busy && "cursor-wait"
             )}
           >
@@ -176,3 +176,4 @@ export function ScreenshotUploader({
     </div>
   );
 }
+

@@ -209,6 +209,7 @@ export function TradeFormModal({
   const supabase = React.useMemo(() => createClient(), []);
   const toast = useToast();
   const isEdit = !!editing;
+  const submitInFlightRef = React.useRef(false);
 
   const [form, setForm] = React.useState<FormState>(() => initialState(editing));
   const [screenshots, setScreenshots] = React.useState<UploadedScreenshot[]>([]);
@@ -232,8 +233,16 @@ export function TradeFormModal({
 
   const { data: analyses = [] } = useDailyAnalysesHistory(account.id, 30);
 
+  // Seed the form only when the record identity changes — never on object
+  // identity alone, otherwise every parent re-render resets the form.
+  const seedKeyRef = React.useRef<string>("");
   React.useEffect(() => {
     if (!open) return;
+
+    const seedKey = `${editing?.id ?? "new"}|${prefillAnalysis?.id ?? "none"}`;
+    if (seedKeyRef.current === seedKey) return;
+    seedKeyRef.current = seedKey;
+
     let nextForm = initialState(editing);
     if (!editing && prefillAnalysis) {
       nextForm = prefillFromAnalysis(nextForm, prefillAnalysis);
@@ -268,17 +277,18 @@ export function TradeFormModal({
               } as UploadedScreenshot;
             })
           );
-          const loaded = withUrls.filter((s) => !!s.url);
-          setScreenshots(loaded);
-          originallyLoadedIds.current = new Set(
-            loaded.filter((s) => s.id).map((s) => s.id as string)
-          );
+          setScreenshots(withUrls.filter((s) => !!s.url));
         } catch {
           // best effort
         }
       })();
     }
-  }, [open, editing, prefillAnalysis, supabase]);
+  }, [open, editing?.id, prefillAnalysis?.id, supabase]);
+
+  // Reset the seed key when the modal closes so the next open re-seeds.
+  React.useEffect(() => {
+    if (!open) seedKeyRef.current = "";
+  }, [open]);
 
   const weeklyLimitReached =
     !isEdit && weeklyTradeCount >= account.max_weekly_trades;
@@ -307,6 +317,16 @@ export function TradeFormModal({
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitInFlightRef.current) return;    // prevent double-submit
+    submitInFlightRef.current = true;
+    try {
+      await _onSubmitInternal(e);
+    } finally {
+      submitInFlightRef.current = false;
+    }
+  }
+
+  async function _onSubmitInternal(e: React.FormEvent) {
     if (weeklyLimitReached) {
       toast.error(
         "Weekly trade limit reached",
@@ -425,11 +445,6 @@ export function TradeFormModal({
 
       // ---------- SCREENSHOTS ----------
       const pending = screenshots.filter((s) => s.file && !s.storagePath);
-      console.log("[ALLTRADES] trade save complete", {
-        tradeId: savedTrade.id,
-        userId: user.id,
-        pendingCount: pending.length,
-      });
 
       if (pending.length > 0) {
         setUploadStatus(
@@ -450,6 +465,7 @@ export function TradeFormModal({
               type: s.file?.type,
             });
 
+            // 1. Upload the file to Storage
             const { path } = await uploadScreenshot(
               supabase,
               user.id,
@@ -458,14 +474,33 @@ export function TradeFormModal({
             );
             console.log("[ALLTRADES] storage upload OK", { path });
 
-            await addTradeScreenshot(
-              supabase,
-              user.id,
-              savedTrade.id,
-              path,
-              "Analysis"
-            );
-            uploadedCount++;
+            // 2. Insert the DB row that links the file to the trade
+            console.log("[ALLTRADES] addTradeScreenshot → payload", {
+              user_id: user.id,
+              trade_id: savedTrade.id,
+              storage_path: path,
+              label: "Analysis",
+            });
+
+            try {
+              const row = await addTradeScreenshot(
+                supabase,
+                user.id,
+                savedTrade.id,
+                path,
+                "Analysis"
+              );
+              console.log("[ALLTRADES] addTradeScreenshot ✓ inserted", row);
+              uploadedCount++;
+            } catch (dbErr) {
+              failedCount++;
+              lastError =
+                dbErr instanceof Error ? dbErr.message : String(dbErr);
+              console.error(
+                "[ALLTRADES] addTradeScreenshot ✗ FAILED — file is in Storage but not linked in DB",
+                dbErr
+              );
+            }
           } catch (uploadErr) {
             failedCount++;
             lastError =
@@ -898,4 +933,7 @@ function Section({
     </section>
   );
 }
+
+
+
 

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus , ArrowUpRight } from "lucide-react";
 import { useCurrentAccount } from "@/components/layout/AppShell";
 import { useTrades, useWithdrawals } from "@/lib/data/hooks";
 import { computeAccountMetrics, computeDrawdownStatus } from "@/lib/calc";
@@ -176,7 +176,25 @@ export function DashboardClient() {
                 </div>
               </div>
 
-              <AccountRiskCard
+              <Link
+            href="/accounting"
+            className="flex items-center justify-between rounded-lg border border-border bg-white px-5 py-4 shadow-card transition-colors hover:border-brand-400"
+          >
+            <div>
+              <div className="text-2xs font-medium uppercase tracking-wide text-ink-500">
+                Business finances
+              </div>
+              <div className="mt-0.5 text-sm font-semibold text-ink-900">
+                Open Accounting
+              </div>
+              <div className="mt-0.5 text-3xs text-ink-500">
+                Track withdrawals, allocations, fund balances and account ladder
+              </div>
+            </div>
+            <ArrowUpRight className="h-4 w-4 text-brand-600" />
+          </Link>
+
+          <AccountRiskCard
                 drawdown={drawdown}
                 maxDailyPercent={Number(currentAccount.max_daily_drawdown_percent) || 2}
                 maxTotalPercent={Number(currentAccount.max_total_drawdown_percent) || 3}
@@ -188,5 +206,8 @@ export function DashboardClient() {
     </div>
   );
 }
+
+
+
 
 

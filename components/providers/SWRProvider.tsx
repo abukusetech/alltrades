@@ -10,9 +10,10 @@ export function SWRProvider({ children }: { children: React.ReactNode }) {
         revalidateOnFocus: false,
         revalidateOnReconnect: false,
         revalidateIfStale: false,
-        dedupingInterval: 5 * 60_000,
+        dedupingInterval: 5 * 60_000, // 5 minutes
         keepPreviousData: true,
         errorRetryCount: 1,
+        errorRetryInterval: 3000,
       }}
     >
       {children}
