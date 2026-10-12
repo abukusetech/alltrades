@@ -6,12 +6,16 @@ import { AccountSwitcher } from "./AccountSwitcher";
 import { cn, formatDateLong, greetingFor } from "@/lib/utils";
 import type { Account } from "@/lib/types";
 
+import type { AccountFilterMode } from "./AppShell";
+
 export interface TopbarProps {
   onOpenSidebar: () => void;
   userName: string;
   accounts: Account[];
   currentAccountId: string | null;
   onSelectAccount: (id: string) => void;
+  filterMode: AccountFilterMode;
+  onFilterModeChange: (mode: AccountFilterMode) => void;
   className?: string;
 }
 
@@ -21,6 +25,8 @@ export function Topbar({
   accounts,
   currentAccountId,
   onSelectAccount,
+  filterMode,
+  onFilterModeChange,
   className,
 }: TopbarProps) {
   // Compute greeting on the client only, to avoid SSR/CSR mismatch
@@ -63,8 +69,11 @@ export function Topbar({
           accounts={accounts}
           currentAccountId={currentAccountId}
           onSelect={onSelectAccount}
+          filterMode={filterMode}
+          onFilterModeChange={onFilterModeChange}
         />
       </div>
     </header>
   );
 }
+

@@ -41,3 +41,18 @@ export async function deleteWithdrawal(
   const { error } = await supabase.from("withdrawals").delete().eq("id", id);
   if (error) throw error;
 }
+
+export async function updateWithdrawal(
+  supabase: SupabaseClient,
+  id: string,
+  values: Record<string, unknown>
+): Promise<Withdrawal> {
+  const { data, error } = await supabase
+    .from("withdrawals")
+    .update(values)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as Withdrawal;
+}

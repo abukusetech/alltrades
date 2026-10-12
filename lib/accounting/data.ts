@@ -512,6 +512,8 @@ export async function createAllocationWithPostings(
     account_fund_amount: number;
     savings_amount: number;
     business_amount: number;
+    /** Where the money comes from. Defaults to business_cash (Maven). */
+    source_fund?: "business_cash" | "personal_broker_cash";
   }
 ): Promise<AccountingAllocation> {
   // 1. Idempotency: refuse if an allocation already exists for this withdrawal
@@ -587,7 +589,7 @@ export async function createAllocationWithPostings(
         amount: args.business_amount,
       },
       {
-        fund_key: "business_cash",
+        fund_key: args.source_fund ?? "business_cash",
         direction: "credit",
         amount: args.total_amount,
       },
@@ -596,3 +598,4 @@ export async function createAllocationWithPostings(
 
   return alloc as AccountingAllocation;
 }
+

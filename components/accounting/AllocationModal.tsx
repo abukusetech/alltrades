@@ -89,6 +89,10 @@ export function AllocationModal({
         account_fund_amount: preview.accountFundAmount,
         savings_amount: preview.savingsAmount,
         business_amount: preview.businessAmount,
+        source_fund:
+          withdrawal.account_type === "PERSONAL"
+            ? "personal_broker_cash"
+            : "business_cash",
       });
       toast.success("Allocation posted", "Funds moved to your three accounts.");
       onDone();
@@ -235,3 +239,4 @@ function PreviewRow({
     </div>
   );
 }
+

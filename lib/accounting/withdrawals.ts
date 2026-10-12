@@ -106,6 +106,8 @@ export function buildWithdrawalFromInput(input: NewWithdrawalInput): Omit<
     notes: input.notes ?? null,
     currency: input.currency ?? "USD",
     exchange_rate_to_usd: input.exchange_rate_to_usd ?? 1,
+    account_id: null,
+    account_type: null,
   };
 }
 
@@ -296,3 +298,5 @@ export async function reverseWithdrawalIncome(
   const { reverseTransaction } = await import("./ledger");
   await reverseTransaction(supabase, userId, txn.id, reason);
 }
+
+

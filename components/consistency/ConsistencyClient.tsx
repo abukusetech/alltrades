@@ -9,6 +9,7 @@ import { AccountHeader } from "@/components/layout/AccountHeader";
 import { BlockLoader } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
 import { ConsistencyScoreCard } from "./ConsistencyScoreCard";
 import { ConsistencyStats } from "./ConsistencyStats";
 import { RuleExplainer } from "./RuleExplainer";
@@ -98,3 +99,4 @@ function GateRow({ ok, label, value }: { ok: boolean; label: string; value: stri
     </div>
   );
 }
+

@@ -44,6 +44,31 @@ export interface Account {
 
   created_at: string;
   updated_at: string;
+  // ---- Phase 17A: account types & rules ----
+  account_type: AccountType;
+  broker: string | null;
+  account_currency: string;
+  account_status: AccountStatus;
+  account_identifier: string | null;
+  current_equity: number | null;
+  floating_pnl: number | null;
+  funding_source: string | null;
+
+  personal_risk_percent: number | null;
+  personal_daily_loss_percent: number | null;
+  personal_max_drawdown_percent: number | null;
+
+  maven_rules: MavenRules | null;
+  rules_effective_from: string | null;
+  rules_effective_to: string | null;
+
+  // ---- Phase 18A: Maven tracking ----
+  maven_rule_version_id: string | null;
+  daily_reference_balance: number | null;
+  daily_reference_set_at: string | null;
+  highest_equity_watermark: number | null;
+  current_balance: number | null;
+  kyc_status: 'Not started' | 'Required' | 'In progress' | 'Verified' | 'Action required';
 }
 
 export interface Trade {
@@ -180,6 +205,9 @@ export interface Withdrawal {
   status: WithdrawalStatus;
   notes: string | null;
   created_at: string;
+
+  // ---- Phase 17D ----
+  account_type: AccountType | null;
 }
 
 export interface WeeklyReview {
@@ -458,6 +486,7 @@ export interface TagGroup {
 // ============================================================
 
 export type AccountingFundKey =
+  | "personal_broker_cash"
   | "business_cash"
   | "account_fund"
   | "personal_savings"
@@ -558,6 +587,11 @@ export interface AccountingWithdrawal {
   exchange_rate_to_usd: number;
   created_at: string;
   updated_at: string;
+
+  // ---- Phase 17D/18E ----
+  account_id: string | null;
+  // ---- Phase 18E ----
+  account_type: AccountType | null;
 }
 
 export interface AccountingAllocation {
@@ -655,4 +689,219 @@ export interface AccountingSnapshot {
   emergency_reserve: number;
   net_cash_flow: number;
   balances: FundBalance[];
+}
+
+
+// ============================================================
+// Phase 17A — Account types (Maven / Personal / Unclassified)
+// ============================================================
+
+export type AccountType = "MAVEN" | "PERSONAL" | "UNCLASSIFIED";
+
+export type AccountStatus =
+  | "active"
+  | "breached"
+  | "suspended"
+  | "closed"
+  | "pending"
+  | "archived";
+
+/**
+ * Maven rule shape. Stored as JSONB so any firm's rules fit
+ * without a schema change. All fields optional — "Not configured"
+ * is a first-class answer.
+ */
+export interface MavenRules {
+  program?: "Instant Funding" | "Evaluation" | "Express" | "Other";
+  daily_loss_percent?: number | null;
+  max_drawdown_percent?: number | null;
+  drawdown_method?: "trailing" | "static" | "balance_based" | "equity_based" | null;
+  reset_time_utc?: string | null;
+  max_risk_per_trade_percent?: number | null;
+  consistency_required?: boolean | null;
+  max_consistency_percent?: number | null;
+  min_payout_amount?: number | null;
+  profit_split_percent?: number | null;
+  min_trading_days?: number | null;
+  max_weekly_trades?: number | null;
+  max_monthly_trades?: number | null;
+  trading_restrictions?: string | null;
+  notes?: string | null;
+}
+
+/**
+ * Personal account rules. These are the user's own configurable
+ * preferences and are never mixed with Maven rules.
+ */
+export interface PersonalRules {
+  risk_percent_per_trade?: number | null;
+  daily_loss_percent?: number | null;
+  max_drawdown_percent?: number | null;
+  notes?: string | null;
+}
+
+/**
+ * Rule change event.
+ */
+export interface AccountRuleHistoryEntry {
+  id: string;
+  user_id: string;
+  account_id: string;
+  changed_at: string;
+  field: string;
+  old_value: unknown;
+  new_value: unknown;
+  reason: string | null;
+}
+
+
+
+
+// ============================================================
+// Phase 18A — Maven rule versions + Personal Trading Plan
+// ============================================================
+
+export interface MavenRulesV2 {
+  daily_drawdown_percent: number;
+  daily_reset_time_utc: string;
+  daily_reference: "higher_of_balance_or_equity" | "balance" | "equity";
+  max_trailing_drawdown_percent: number;
+  trailing_reference: "highest_equity_watermark" | "highest_balance_watermark";
+  max_floating_loss_percent: number;
+  max_risk_per_trade_percent: number;
+  min_payout_profit_percent: number;
+  consistency_max_percent: number;
+  trader_profit_share_percent: number;
+  firm_profit_share_percent: number;
+  max_withdrawal_per_30d: number;
+  payout_processing_days: number;
+  account_resets_after_payout: boolean;
+  require_kyc: boolean;
+  inactivity_warning_days: number;
+  excessive_scalping_threshold_seconds: number;
+  excessive_scalping_percent: number;
+  support_account_sizes: number[];
+}
+
+export interface MavenRuleVersion {
+  id: string;
+  user_id: string;
+  version_label: string;
+  program: string;
+  effective_from: string;
+  effective_to: string | null;
+  verified_on: string | null;
+  source_url: string | null;
+  notes: string | null;
+  rules: MavenRulesV2;
+  created_at: string;
+}
+
+export type PersonalRiskBasis = "balance" | "equity" | "starting_balance";
+export type PersonalApprovalMode = "informational" | "warning" | "block";
+export type PersonalSlUnit = "pips" | "points" | "price";
+export type PersonalTpMethod = "rr" | "pips" | "price" | "atr" | "other";
+
+export interface PersonalTradingPlan {
+  id: string;
+  user_id: string;
+  account_id: string;
+  version_label: string;
+  effective_from: string;
+  is_active: boolean;
+
+  // Capital
+  currency: string;
+  risk_basis: PersonalRiskBasis;
+  funding_source: string | null;
+
+  // Risk Management
+  default_risk_percent: number | null;
+  default_fixed_risk: number | null;
+  max_risk_percent: number | null;
+  high_quality_risk_percent: number | null;
+  low_quality_risk_percent: number | null;
+  max_daily_loss_percent: number | null;
+  max_weekly_loss_percent: number | null;
+  max_monthly_loss_percent: number | null;
+  max_drawdown_percent: number | null;
+  max_open_trades: number | null;
+  max_trades_per_day: number | null;
+  max_trades_per_week: number | null;
+  max_trades_per_month: number | null;
+  max_aggregate_open_risk_percent: number | null;
+  max_consecutive_losses: number | null;
+  cooldown_hours_after_loss: number | null;
+  limits_enabled: Record<string, boolean>;
+
+  // Profit Targets
+  daily_target_percent: number | null;
+  weekly_target_percent: number | null;
+  monthly_target_percent: number | null;
+  daily_target_amount: number | null;
+  weekly_target_amount: number | null;
+  monthly_target_amount: number | null;
+  min_rr: number | null;
+  preferred_rr: number | null;
+  stop_after_daily_target: boolean;
+  stop_after_weekly_target: boolean;
+  stop_after_monthly_target: boolean;
+  targets_enabled: Record<string, boolean>;
+
+  // Stop Loss / Take Profit
+  default_sl_pips: number | null;
+  sl_unit: PersonalSlUnit;
+  min_sl_pips: number | null;
+  max_sl_pips: number | null;
+  default_tp_pips: number | null;
+  preferred_rr_tp: number | null;
+  tp_method: PersonalTpMethod | null;
+  min_expected_reward: number | null;
+  preferred_exit_method: string | null;
+  max_lot_size: number | null;
+  min_lot_size: number | null;
+  lot_increment: number | null;
+  breakeven_enabled: boolean;
+  breakeven_at_rr: number | null;
+  partial_close_enabled: boolean;
+  partial_close_at_rr: number | null;
+  partial_close_percent: number | null;
+  trailing_stop_enabled: boolean;
+  sl_tp_by_instrument: Record<string, unknown>;
+
+  // Strategy & Discipline
+  preferred_instruments: string[] | null;
+  preferred_sessions: string[] | null;
+  preferred_trading_days: string[] | null;
+  require_htf_confirmation: boolean;
+  require_market_structure: boolean;
+  require_liquidity_conditions: boolean;
+  require_entry_confirmation: boolean;
+  permitted_setups: string[] | null;
+  min_setup_quality: "Low" | "Medium" | "High" | null;
+  confidence_requirement: "Low" | "Medium" | "High" | null;
+  news_restrictions: string | null;
+  max_low_quality_risk_percent: number | null;
+  approval_mode: PersonalApprovalMode;
+
+  // Trading Schedule
+  active_from: string | null;
+  active_to: string | null;
+  active_timezone: string | null;
+
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlanHistoryEntry {
+  id: string;
+  user_id: string;
+  account_id: string;
+  plan_kind: "MAVEN" | "PERSONAL";
+  changed_at: string;
+  changed_by: string | null;
+  summary: string | null;
+  diff: Record<string, unknown> | null;
+  version_label: string | null;
 }

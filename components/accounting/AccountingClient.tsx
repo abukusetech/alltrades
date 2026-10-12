@@ -12,6 +12,7 @@ import {
   FileBarChart,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useCurrentAccount } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -37,6 +38,7 @@ import type {
 } from "@/lib/types";
 import { cn, formatCurrency } from "@/lib/utils";
 import { SummaryCard } from "./SummaryCard";
+import { CashFlowByType } from "./CashFlowByType";
 import { PeriodFilter, computePeriod, type PeriodValue } from "./PeriodFilter";
 import { FundBalancesPanel } from "./FundBalancesPanel";
 import { TransactionLedger } from "./TransactionLedger";
@@ -70,7 +72,35 @@ const ReportsPanel = dynamic(
 
 type Tab = "overview" | "withdrawals" | "ladder" | "planner" | "goals" | "reports";
 
+/**
+ * Warm the Reports bundle in the background so opening the Reports tab
+ * feels instant. The chunk is ~100 kB (Recharts). Firing this on idle
+ * keeps the initial /accounting load light while making the tab instant.
+ */
+function warmReportsChunk() {
+  if (typeof window === "undefined") return;
+  const warm = () => {
+    void import("./ReportsPanel").catch(() => {
+      // best-effort prefetch
+    });
+  };
+  const w = window as Window & {
+    requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => void;
+  };
+  if (typeof w.requestIdleCallback === "function") {
+    w.requestIdleCallback(warm, { timeout: 3000 });
+  } else {
+    window.setTimeout(warm, 2000);
+  }
+}
+
 export function AccountingClient() {
+  const { currentAccount } = useCurrentAccount();
+
+  React.useEffect(() => {
+    warmReportsChunk();
+  }, []);
+  const { accounts } = useCurrentAccount();
   const supabase = React.useMemo(() => createClient(), []);
   const toast = useToast();
 
@@ -291,7 +321,12 @@ export function AccountingClient() {
             <BlockLoader label="Loading accounting data" />
           ) : (
             <>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <CashFlowByType
+            transactions={transactions}
+            accounts={accounts}
+          />
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <SummaryCard label="Withdrawals received" value={formatCurrency(totalWithdrawals)} hint={`${period.from} → ${period.to}`} tone={totalWithdrawals > 0 ? "profit" : "neutral"} />
                 <SummaryCard label="Business cash" value={formatCurrency(balance("business_cash"))} tone={balance("business_cash") < 0 ? "loss" : "neutral"} />
                 <SummaryCard label="Account fund" value={formatCurrency(balance("account_fund"))} hint="Reserved for future accounts" tone="brand" />
@@ -382,7 +417,14 @@ export function AccountingClient() {
       <EditTransactionModal transaction={editTarget} postings={editPostings} open={!!editTarget} onClose={() => setEditTarget(null)} onSaved={() => void load()} funds={funds} />
       <DeleteTransactionModal transaction={deleteTarget} open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={() => void load()} />
 
-      <WithdrawalFormModal open={wFormOpen} onClose={() => setWFormOpen(false)} onSaved={() => void load()} editing={wEditing} settings={settings} />
+      <WithdrawalFormModal
+        open={wFormOpen}
+        onClose={() => setWFormOpen(false)}
+        onSaved={() => void load()}
+        editing={wEditing}
+        settings={settings}
+        account={currentAccount}
+      />
       <PaymentModal
         withdrawal={payTarget}
         open={!!payTarget}
@@ -446,5 +488,13 @@ function TabButton({
     </button>
   );
 }
+
+
+
+
+
+
+
+
 
 

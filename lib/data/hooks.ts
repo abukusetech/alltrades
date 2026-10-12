@@ -10,7 +10,7 @@ import { getWeeklyReview } from "./weekly-reviews";
 import { swrKeys } from "./keys";
 import type { Trade, Withdrawal, Analysis, WeeklyReview } from "@/lib/types";
 
-// One browser client for all hooks in this module.
+// One browser client for the entire app.
 const supabase = createClient();
 
 export function useTrades(accountId: string | null) {
@@ -50,8 +50,60 @@ export function useWeeklyReview(
 }
 
 /**
- * Returns a callback that revalidates all account-scoped data.
- * Use after a mutation (create/edit/delete trade, withdrawal, analysis).
+ * Load trades for a set of accounts (Dashboard / Analytics in All / Maven / Personal mode).
+ * The key is stable — computed from a sorted list of account IDs — and only
+ * re-computed when the actual set of accounts changes.
+ */
+export function useTradesForFilter(
+  accounts: { id: string; account_type: string }[]
+) {
+  // Stable dependency: only changes when the actual set of IDs changes.
+  const idsKey = React.useMemo(() => {
+    if (accounts.length === 0) return null;
+    return accounts.map((a) => a.id).sort().join(",");
+  }, [accounts]);
+
+  return useSWR<Trade[]>(
+    idsKey ? (["tradesFilter", idsKey] as const) : null,
+    async ([, key]: readonly [string, string]) => {
+      const ids = key.split(",");
+      if (ids.length === 0) return [];
+      const { data, error } = await supabase
+        .from("trades")
+        .select("*")
+        .in("account_id", ids)
+        .order("trade_date", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Trade[];
+    },
+    { suspense: false }
+  );
+}
+
+export function useWithdrawalsForFilter(accounts: { id: string }[]) {
+  const idsKey = React.useMemo(() => {
+    if (accounts.length === 0) return null;
+    return accounts.map((a) => a.id).sort().join(",");
+  }, [accounts]);
+
+  return useSWR<Withdrawal[]>(
+    idsKey ? (["withdrawalsFilter", idsKey] as const) : null,
+    async ([, key]: readonly [string, string]) => {
+      const ids = key.split(",");
+      if (ids.length === 0) return [];
+      const { data, error } = await supabase
+        .from("withdrawals")
+        .select("*")
+        .in("account_id", ids);
+      if (error) throw error;
+      return (data ?? []) as Withdrawal[];
+    },
+    { suspense: false }
+  );
+}
+
+/**
+ * Revalidates all account-scoped data.
  */
 export function useRevalidateAccount(accountId: string | null) {
   const { mutate: mTrades } = useSWR(swrKeys.trades(accountId));
@@ -62,3 +114,4 @@ export function useRevalidateAccount(accountId: string | null) {
     await Promise.all([mTrades(), mWithdrawals(), mAnalyses()]);
   }, [mTrades, mWithdrawals, mAnalyses]);
 }
+
