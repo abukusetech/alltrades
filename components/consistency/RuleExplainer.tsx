@@ -11,9 +11,9 @@ export function RuleExplainer() {
       <CardBody className="space-y-3 text-2xs leading-relaxed text-ink-600">
         <p>
           The consistency rule caps the share of your total profit that may come
-          from any single winning day. If one day accounts for too much of your
-          profit, the withdrawal is blocked until the ratio falls back within
-          the limit.
+          from any single winning day. Losing days reduce your total profit, so
+          they can bring the score down toward the 20% limit — or push the
+          account below zero, in which case the score shows N/A.
         </p>
         <div className="rounded border border-border bg-surface-soft p-3">
           <div className="text-3xs font-medium uppercase tracking-wide text-ink-500">
@@ -25,26 +25,41 @@ export function RuleExplainer() {
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           <Example
-            label="Example — allowed"
-            biggest="$1,000"
-            total="$5,000"
+            label="Example — passed"
+            biggest="$20"
+            total="$100"
             score="20.0%"
             tone="profit"
           />
           <Example
-            label="Example — blocked"
-            biggest="$2,000"
-            total="$5,000"
-            score="40.0%"
+            label="Example — not passed"
+            biggest="$50"
+            total="$80"
+            score="62.5%"
             tone="loss"
           />
         </div>
+        <div className="rounded border border-border bg-surface-soft p-3">
+          <div className="text-3xs font-medium uppercase tracking-wide text-ink-500">
+            Additional profit needed
+          </div>
+          <div className="mt-1 font-mono text-xs text-ink-900">
+            (Biggest winning day ÷ 0.20) − Total net profit
+          </div>
+          <p className="mt-1 text-3xs text-ink-500">
+            The result never goes below $0.00. This assumes the biggest
+            winning day does not change — if a new biggest winning day
+            appears, the target and the required amount recalculate
+            automatically.
+          </p>
+        </div>
         <p>
-          <strong className="text-ink-900">Required total profit</strong> for a
-          20% consistency score is{" "}
-          <span className="font-mono">Biggest winning day × 5</span>. Both the
-          profit target and the consistency rule must be satisfied before a
-          withdrawal can be recorded.
+          <strong className="text-ink-900">Passed</strong> means the score is at
+          or below 20%.{" "}
+          <strong className="text-ink-900">Not passed</strong> means the score
+          exceeds 20% — a withdrawal is blocked until it comes down. When total
+          profit is zero or negative, the score shows <strong>N/A</strong> and a
+          withdrawal is not available.
         </p>
       </CardBody>
     </Card>
@@ -78,7 +93,7 @@ function Example({
       <div className="mt-1 text-2xs text-ink-700">
         Biggest: <span className="tabular font-medium">{biggest}</span>
         {" · "}
-        Total: <span className="tabular font-medium">{total}</span>
+        Total profit: <span className="tabular font-medium">{total}</span>
       </div>
       <div
         className={
@@ -92,3 +107,4 @@ function Example({
     </div>
   );
 }
+

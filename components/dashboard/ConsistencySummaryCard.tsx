@@ -1,66 +1,72 @@
-﻿import { ShieldCheck, ShieldAlert, ShieldX } from "lucide-react";
+﻿import { ShieldCheck, ShieldX, ShieldAlert } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import type { AccountMetrics } from "@/lib/calc";
-import { formatCurrency, formatPercent } from "@/lib/utils";
+import { cn, formatCurrency, formatPercent } from "@/lib/utils";
 
 export interface ConsistencySummaryCardProps {
   metrics: AccountMetrics;
 }
 
 export function ConsistencySummaryCard({ metrics }: ConsistencySummaryCardProps) {
+  const c = metrics.consistency;
   const {
-    consistencyScore,
-    maxConsistencyPercent,
-    consistencyStatus,
     biggestWinningDay,
-    requiredTotalProfit,
     totalProfit,
-  } = metrics;
+    score,
+    maxAllowed,
+    status,
+    additionalProfitRequired,
+  } = c;
 
   const Icon =
-    consistencyStatus === "over"
-      ? ShieldX
-      : consistencyStatus === "approaching"
-        ? ShieldAlert
-        : ShieldCheck;
+    status === "passed" ? ShieldCheck : status === "na" ? ShieldAlert : ShieldX;
 
   const iconClass =
-    consistencyStatus === "over"
-      ? "text-loss-text"
-      : consistencyStatus === "approaching"
-        ? "text-warn-text"
-        : "text-profit-text";
+    status === "passed"
+      ? "text-profit-text"
+      : status === "na"
+        ? "text-ink-400"
+        : "text-loss-text";
 
   const tone =
-    consistencyStatus === "over"
-      ? "loss"
-      : consistencyStatus === "approaching"
-        ? "warn"
-        : "profit";
+    status === "passed" ? "profit" : status === "na" ? "neutral" : "loss";
+
+  const badgeLabel =
+    status === "passed" ? "PASSED" : status === "na" ? "N/A" : "NOT PASSED";
+
+  const additionalLabel =
+    additionalProfitRequired === null
+      ? "—"
+      : additionalProfitRequired <= 0
+        ? "$0.00"
+        : formatCurrency(additionalProfitRequired);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Consistency Score</CardTitle>
-        <Badge tone={tone}>
-          {consistencyStatus === "over"
-            ? "Above limit"
-            : consistencyStatus === "approaching"
-              ? "Approaching"
-              : "Within limit"}
-        </Badge>
+        <Badge tone={tone}>{badgeLabel}</Badge>
       </CardHeader>
 
       <CardBody className="space-y-4">
         <div className="flex items-start gap-3">
           <Icon className={`h-5 w-5 shrink-0 ${iconClass}`} />
           <div>
-            <div className="tabular text-2xl font-semibold tracking-tight text-ink-900">
-              {formatPercent(consistencyScore, 1)}
+            <div
+              className={cn(
+                "tabular text-2xl font-semibold tracking-tight",
+                status === "passed"
+                  ? "text-profit-text"
+                  : status === "failed"
+                    ? "text-loss-text"
+                    : "text-ink-500"
+              )}
+            >
+              {score !== null ? formatPercent(score, 1) : "N/A"}
             </div>
             <p className="mt-0.5 text-2xs text-ink-500">
-              Maximum allowed: {formatPercent(maxConsistencyPercent, 0)}
+              Maximum allowed: {formatPercent(maxAllowed, 0)}
             </p>
           </div>
         </div>
@@ -71,17 +77,28 @@ export function ConsistencySummaryCard({ metrics }: ConsistencySummaryCardProps)
             value={formatCurrency(biggestWinningDay)}
           />
           <Metric
-            label="Total profit"
-            value={formatCurrency(totalProfit)}
+            label="Total net profit"
+            value={formatCurrency(totalProfit, { showSign: true })}
+            valueClass={
+              totalProfit > 0
+                ? "text-profit-text"
+                : totalProfit < 0
+                  ? "text-loss-text"
+                  : undefined
+            }
           />
           <Metric
-            label="Required total profit"
-            value={formatCurrency(requiredTotalProfit)}
-            hint="Biggest winning day × 5"
+            label="Additional profit to reach 20%"
+            value={additionalLabel}
+            valueClass={
+              additionalProfitRequired !== null && additionalProfitRequired > 0
+                ? "text-warn-text"
+                : "text-profit-text"
+            }
           />
           <Metric
-            label="Rule"
-            value={`≤ ${formatPercent(maxConsistencyPercent, 0)}`}
+            label="Maximum allowed"
+            value={formatPercent(maxAllowed, 0)}
           />
         </div>
       </CardBody>
@@ -92,19 +109,23 @@ export function ConsistencySummaryCard({ metrics }: ConsistencySummaryCardProps)
 function Metric({
   label,
   value,
-  hint,
+  valueClass,
 }: {
   label: string;
   value: string;
-  hint?: string;
+  valueClass?: string;
 }) {
   return (
     <div>
       <div className="text-3xs uppercase tracking-wide text-ink-500">{label}</div>
-      <div className="tabular mt-0.5 text-sm font-semibold text-ink-900">
+      <div
+        className={cn(
+          "tabular mt-0.5 text-sm font-semibold text-ink-900",
+          valueClass
+        )}
+      >
         {value}
       </div>
-      {hint && <div className="text-3xs text-ink-400">{hint}</div>}
     </div>
   );
 }

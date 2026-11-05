@@ -58,7 +58,15 @@ export function ConsistencyClient() {
               <Card>
                 <CardHeader><CardTitle>Withdrawal gate</CardTitle></CardHeader>
                 <CardBody className="space-y-3">
-                  <GateRow ok={metrics.consistencyScore <= metrics.maxConsistencyPercent} label="Consistency ≤ 20%" value={`${metrics.consistencyScore.toFixed(1)}%`} />
+                  <GateRow
+                    ok={metrics.consistency.status === "passed"}
+                    label="Consistency ≤ 20%"
+                    value={
+                      metrics.consistency.score !== null
+                        ? `${metrics.consistency.score.toFixed(1)}%`
+                        : "N/A"
+                    }
+                  />
                   <GateRow ok={metrics.targetReached} label="Profit target reached" value={metrics.targetReached ? "Yes" : `$${metrics.amountRemaining.toFixed(2)} to go`} />
                   <div className={
                     metrics.withdrawalEligible
@@ -71,7 +79,9 @@ export function ConsistencyClient() {
                         ? "Withdrawal blocked — profit target not yet reached."
                         : metrics.withdrawalBlockReason === "CONSISTENCY_ABOVE_LIMIT"
                           ? "Withdrawal blocked — consistency above limit."
-                          : "Withdrawal blocked."}
+                          : metrics.withdrawalBlockReason === "NO_PROFIT"
+                            ? "Withdrawal blocked — no net profit to score."
+                            : "Withdrawal blocked."}
                   </div>
                 </CardBody>
               </Card>
@@ -99,4 +109,6 @@ function GateRow({ ok, label, value }: { ok: boolean; label: string; value: stri
     </div>
   );
 }
+
+
 

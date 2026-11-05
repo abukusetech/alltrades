@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import * as React from "react";
+import useSWR from "swr";
 import {
   Plus,
   RefreshCw,
@@ -43,6 +44,9 @@ import { PeriodFilter, computePeriod, type PeriodValue } from "./PeriodFilter";
 import { FundBalancesPanel } from "./FundBalancesPanel";
 import { TransactionLedger } from "./TransactionLedger";
 import { AddTransactionModal } from "./AddTransactionModal";
+import { OwnerContributionModal } from "@/lib/accounting/OwnerContributionModal";
+import { AccountPurchaseModal } from "@/lib/accounting/AccountPurchaseModal";
+import { PlusCircle, ShoppingCart } from "lucide-react";
 import { ReverseTransactionModal } from "./ReverseTransactionModal";
 import { EditTransactionModal } from "./EditTransactionModal";
 import { DeleteTransactionModal } from "./DeleteTransactionModal";
@@ -95,7 +99,7 @@ function warmReportsChunk() {
 }
 
 export function AccountingClient() {
-  const { currentAccount } = useCurrentAccount();
+  const { currentAccount, currentAccountId } = useCurrentAccount();
 
   React.useEffect(() => {
     warmReportsChunk();
@@ -109,16 +113,55 @@ export function AccountingClient() {
     computePeriod("month")
   );
 
-  const [funds, setFunds] = React.useState<AccountingFund[]>([]);
-  const [transactions, setTransactions] = React.useState<AccountingTransaction[]>([]);
-  const [ledger, setLedger] = React.useState<AccountingLedgerEntry[]>([]);
-  const [balances, setBalances] = React.useState<FundBalance[]>([]);
-  const [withdrawals, setWithdrawals] = React.useState<AccountingWithdrawal[]>([]);
-  const [purchases, setPurchases] = React.useState<AccountingPurchase[]>([]);
-  const [settings, setSettings] = React.useState<AccountingSettings | null>(null);
-  const [loading, setLoading] = React.useState(false);
+  // Use SWR to cache the fetch so tab switching is instant
+  const { data, isLoading: loading, mutate } = useSWR(
+    ["accounting", currentAccountId, period.from, period.to],
+    async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not signed in");
+
+      const [f, txs, ledgerRows, wds, ps, s] = await Promise.all([
+        listFunds(supabase, user.id),
+        listTransactions(supabase, user.id, { from: period.from, to: period.to }),
+        listLedger(supabase, user.id, { from: period.from, to: period.to }),
+        listWithdrawals(supabase, user.id),
+        listPurchases(supabase, user.id),
+        getSettings(supabase, user.id),
+      ]);
+
+      const computedBalances = computeBalances(
+        ledgerRows,
+        f.map((x) => ({ key: x.key, label: x.label, kind: x.kind }))
+      );
+
+      return {
+        funds: f,
+        transactions: txs,
+        ledger: ledgerRows,
+        balances: computedBalances,
+        withdrawals: wds,
+        purchases: ps,
+        settings: s,
+      };
+    },
+    {
+      revalidateOnFocus: false,
+      keepPreviousData: true,
+    }
+  );
+
+  const funds = data?.funds ?? [];
+  const transactions = data?.transactions ?? [];
+  const ledger = data?.ledger ?? [];
+  const balances = data?.balances ?? [];
+  const withdrawals = data?.withdrawals ?? [];
+  const purchases = data?.purchases ?? [];
+  const settings = data?.settings ?? null;
 
   const [addOpen, setAddOpen] = React.useState(false);
+  const [ocOpen, setOcOpen] = React.useState(false);
+  const [apOpen, setApOpen] = React.useState(false);
+  const [apSize, setApSize] = React.useState<number | undefined>(undefined);
   const [reverseTarget, setReverseTarget] = React.useState<AccountingTransaction | null>(null);
   const [editTarget, setEditTarget] = React.useState<AccountingTransaction | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<AccountingTransaction | null>(null);
@@ -129,48 +172,9 @@ export function AccountingClient() {
   const [allocTarget, setAllocTarget] = React.useState<AccountingWithdrawal | null>(null);
   const [allocNet, setAllocNet] = React.useState<number | null>(null);
 
-  const load = React.useCallback(async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
+  
 
-    setLoading(true);
-    try {
-      const [f, txs, ledgerRows, wds, ps, s] = await Promise.all([
-        listFunds(supabase, user.id),
-        listTransactions(supabase, user.id, { from: period.from, to: period.to }),
-        listLedger(supabase, user.id, { from: period.from, to: period.to }),
-        listWithdrawals(supabase, user.id),
-        listPurchases(supabase, user.id),
-        getSettings(supabase, user.id),
-      ]);
-      setFunds(f);
-      setTransactions(txs);
-      setLedger(ledgerRows);
-      setWithdrawals(wds);
-      setPurchases(ps);
-      setSettings(s);
-      setBalances(
-        computeBalances(
-          ledgerRows,
-          f.map((x) => ({ key: x.key, label: x.label, kind: x.kind }))
-        )
-      );
-    } catch (err) {
-      console.error("[ALLTRADES] accounting load failed", err);
-      toast.error(
-        "Could not load accounting",
-        err instanceof Error ? err.message : undefined
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [supabase, period.from, period.to, toast]);
 
-  React.useEffect(() => {
-    void load();
-  }, [load]);
 
   const balance = (key: string) =>
     balances.find((b) => b.fund_key === key)?.balance ?? 0;
@@ -233,19 +237,37 @@ export function AccountingClient() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => void load()}
+              onClick={() => void mutate()}
               leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
             >
               Refresh
             </Button>
             {tab === "overview" && (
-              <Button
-                size="sm"
-                onClick={() => setAddOpen(true)}
-                leftIcon={<Plus className="h-3.5 w-3.5" />}
-              >
-                Record Transaction
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setOcOpen(true)}
+                  leftIcon={<PlusCircle className="h-3.5 w-3.5" />}
+                >
+                  Owner Funding
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setApOpen(true)}
+                  leftIcon={<ShoppingCart className="h-3.5 w-3.5" />}
+                >
+                  Buy Account
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setAddOpen(true)}
+                  leftIcon={<Plus className="h-3.5 w-3.5" />}
+                >
+                  Record Transaction
+                </Button>
+              </>
             )}
             {tab === "withdrawals" && (
               <Button
@@ -370,7 +392,7 @@ export function AccountingClient() {
             <CardBody>
               <WithdrawalsPanel
                 withdrawals={withdrawals}
-                onRefresh={() => void load()}
+                onRefresh={() => void mutate()}
                 onAdd={() => { setWEditing(null); setWFormOpen(true); }}
                 onEdit={(w) => { setWEditing(w); setWFormOpen(true); }}
                 onMarkPaid={(w) => setPayTarget(w)}
@@ -383,8 +405,13 @@ export function AccountingClient() {
 
       {tab === "ladder" && (
         <AccountLadderPanel
+          key={transactions.length} // <--- FORCES REMOUNT WHEN TRANSACTIONS CHANGE
           accountFundBalance={balance("account_fund")}
           settings={settings}
+          onBuyAccount={(size) => {
+            setApSize(size);
+            setApOpen(true);
+          }}
         />
       )}
 
@@ -412,15 +439,23 @@ export function AccountingClient() {
         />
       )}
 
-      <AddTransactionModal open={addOpen} onClose={() => setAddOpen(false)} onSaved={() => void load()} funds={funds} />
-      <ReverseTransactionModal transaction={reverseTarget} open={!!reverseTarget} onClose={() => setReverseTarget(null)} onReversed={() => void load()} />
-      <EditTransactionModal transaction={editTarget} postings={editPostings} open={!!editTarget} onClose={() => setEditTarget(null)} onSaved={() => void load()} funds={funds} />
-      <DeleteTransactionModal transaction={deleteTarget} open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={() => void load()} />
+      <AddTransactionModal open={addOpen} onClose={() => setAddOpen(false)} onSaved={() => void mutate()} funds={funds} />
+      <OwnerContributionModal open={ocOpen} onClose={() => setOcOpen(false)} onSaved={() => void mutate()} />
+      <AccountPurchaseModal 
+        open={apOpen} 
+        onClose={() => { setApOpen(false); setApSize(undefined); }} 
+        onSaved={() => void mutate()} 
+        initialSize={apSize}
+        accountFundBalance={balance("account_fund")}
+      />
+      <ReverseTransactionModal transaction={reverseTarget} open={!!reverseTarget} onClose={() => setReverseTarget(null)} onReversed={() => void mutate()} />
+      <EditTransactionModal transaction={editTarget} postings={editPostings} open={!!editTarget} onClose={() => setEditTarget(null)} onSaved={() => void mutate()} funds={funds} />
+      <DeleteTransactionModal transaction={deleteTarget} open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={() => void mutate()} />
 
       <WithdrawalFormModal
         open={wFormOpen}
         onClose={() => setWFormOpen(false)}
-        onSaved={() => void load()}
+        onSaved={() => void mutate()}
         editing={wEditing}
         settings={settings}
         account={currentAccount}
@@ -432,7 +467,7 @@ export function AccountingClient() {
         onPaid={(updated, net) => {
           setAllocTarget(updated);
           setAllocNet(net);
-          void load();
+          void mutate();
         }}
       />
       <AllocationModal
@@ -440,7 +475,7 @@ export function AccountingClient() {
         netAmount={allocNet}
         open={!!allocTarget && allocNet !== null}
         onClose={() => { setAllocTarget(null); setAllocNet(null); }}
-        onDone={() => { setAllocTarget(null); setAllocNet(null); void load(); }}
+        onDone={() => { setAllocTarget(null); setAllocNet(null); void mutate(); }}
         settings={settings}
       />
     </div>
@@ -488,6 +523,13 @@ function TabButton({
     </button>
   );
 }
+
+
+
+
+
+
+
 
 
 

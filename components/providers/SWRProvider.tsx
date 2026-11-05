@@ -8,19 +8,21 @@ export function SWRProvider({ children }: { children: React.ReactNode }) {
     <SWRConfig
       value={{
         // Serving from cache is instant when navigating back to a page.
-        revalidateOnFocus: false,
-        revalidateOnReconnect: false,
-        revalidateIfStale: false,
+        revalidateOnFocus: true,
+        revalidateOnReconnect: true,
+        revalidateIfStale: true,
         dedupingInterval: 5 * 60_000, // 5 minutes
+        focusThrottleInterval: 30_000,
         keepPreviousData: true,
-        errorRetryCount: 1,
+        errorRetryCount: 2,
         errorRetryInterval: 3000,
         // Serve stale data immediately, refresh in the background.
         // This gives instant navigations with fresh data 300ms later.
-        focusThrottleInterval: 5 * 60_000,
       }}
     >
       {children}
     </SWRConfig>
   );
 }
+
+

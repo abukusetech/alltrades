@@ -161,9 +161,15 @@ function TypeBlock({
         {type === "MAVEN" ? (
           <MetricCard
             label="Consistency Score"
-            value={formatPercent(metrics.consistencyScore, 1)}
+            value={
+              metrics.consistencyScore !== null
+                ? formatPercent(metrics.consistencyScore, 1)
+                : "N/A"
+            }
             valueClassName={
-              metrics.consistencyScore > 20 ? "text-warn-text" : undefined
+              metrics.consistencyScore !== null && metrics.consistencyScore > 20
+                ? "text-loss-text"
+                : undefined
             }
             hint="Biggest winning day ÷ total profit"
           />
@@ -191,4 +197,5 @@ function TypeBlock({
     </div>
   );
 }
+
 

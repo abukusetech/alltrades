@@ -197,21 +197,38 @@ const [date, setDate] = React.useState(
     };
   }, [date]);
 
-  const seededIdRef = React.useRef<string | null>(null);
+
+
+  // Seed the local working copy from the server, but never clobber newer
+  // local edits. We track the last server-seeded id AND the date. On any
+  // change of date OR when a record arrives late (null -> row), reseed.
+  const seededKeyRef = React.useRef<string | null>(null);
   React.useEffect(() => {
-    if (!existing) {
-      // Only clear when we genuinely have no record for this date
-      if (seededIdRef.current !== null) {
-        setAnalysis(null);
-        seededIdRef.current = null;
-      }
-      return;
+    // Compute a key that changes when we should re-seed:
+    //   - no record for this date  => "none:<date>"
+    //   - record exists            => "<id>:<date>"
+    const nextKey = existing
+      ? `${existing.id}:${date}`
+      : `none:${date}`;
+
+    if (seededKeyRef.current === nextKey) return;
+
+    // First visit to this date, OR a fresh record arrived from the server,
+    // OR we navigated to a new date. Seed.
+    if (existing) {
+      // Normalize legacy direction: if only primary_direction was set,
+      // promote it to planned_direction so the form reflects the saved state.
+      const normalized = {
+        ...existing,
+        planned_direction:
+          existing.planned_direction ?? existing.primary_direction ?? null,
+      };
+      setAnalysis(normalized);
+    } else {
+      setAnalysis(null);
     }
-    if (seededIdRef.current === existing.id) return;
-    // New record loaded (different day or first open) — seed once.
-    setAnalysis(existing);
-    seededIdRef.current = existing.id;
-  }, [existing]);
+    seededKeyRef.current = nextKey;
+  }, [existing, date]);
 
   // Debounced save
   const saveTimer = React.useRef<number | null>(null);
@@ -229,7 +246,8 @@ const [date, setDate] = React.useState(
           instrument: a.instrument || "EURUSD",
           higher_timeframe_bias: a.higher_timeframe_bias,
           market_structure: a.market_structure,
-          primary_direction: a.primary_direction,
+          primary_direction: a.planned_direction ?? a.primary_direction,
+          planned_direction: a.planned_direction ?? a.primary_direction,
           confidence: a.confidence,
           analysis_notes: a.analysis_notes,
           tf_4h: a.tf_4h,
@@ -246,7 +264,6 @@ const [date, setDate] = React.useState(
           news_currency: a.news_currency,
           news_notes: a.news_notes,
           confirmation_checklist: a.confirmation_checklist,
-          planned_direction: a.planned_direction,
           planned_entry: a.planned_entry,
           planned_stop_loss: a.planned_stop_loss,
           planned_take_profit: a.planned_take_profit,
@@ -297,11 +314,42 @@ const [date, setDate] = React.useState(
     [currentAccountId, supabase, mutate, toast]
   );
 
+  // Flush any pending save when the user leaves the page or closes the tab.
+  // Declared after `persist` so the dependency is in scope.
+  React.useEffect(() => {
+    const flush = () => {
+      if (saveTimer.current) {
+        window.clearTimeout(saveTimer.current);
+        saveTimer.current = null;
+      }
+      if (analysis) {
+        void persist(analysis);
+      }
+    };
+    window.addEventListener("beforeunload", flush);
+    return () => {
+      window.removeEventListener("beforeunload", flush);
+    };
+  }, [analysis, persist]);
+
   const update = React.useCallback(
     (patch: Partial<DailyAnalysis>) => {
       setAnalysis((prev) => {
         if (!prev) return prev;
-        const next = { ...prev, ...patch };
+        // If either direction field is being patched, mirror it to both so
+        // the legacy primary_direction column and the planned_direction
+        // column never diverge. Reads elsewhere use planned_direction.
+        const patchedDirection =
+          patch.planned_direction !== undefined
+            ? patch.planned_direction
+            : patch.primary_direction !== undefined
+              ? patch.primary_direction
+              : undefined;
+        const withDirection =
+          patchedDirection !== undefined
+            ? { ...patch, primary_direction: patchedDirection, planned_direction: patchedDirection }
+            : patch;
+        const next = { ...prev, ...withDirection };
         // 1. Write a local draft immediately (so refresh / close is safe)
         draft.writeDraft(next);
         // 2. Schedule the debounced server save
@@ -1803,6 +1851,12 @@ function HistoryCard({
     </Card>
   );
 }
+
+
+
+
+
+
 
 
 

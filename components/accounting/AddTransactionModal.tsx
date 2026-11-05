@@ -37,13 +37,13 @@ export function AddTransactionModal({
   const supabase = React.useMemo(() => createClient(), []);
   const toast = useToast();
 
-  const [mode, setMode] = React.useState<Mode>("income");
+  const [mode, setMode] = React.useState<Mode>("transfer");
   const [date, setDate] = React.useState(toDateKey(new Date()));
   const [amount, setAmount] = React.useState("");
   const [currency, setCurrency] = React.useState("USD");
   const [rate, setRate] = React.useState("1");
-  const [fromFund, setFromFund] = React.useState<string>("trading_income");
-  const [toFund, setToFund] = React.useState<string>("business_cash");
+  const [fromFund, setFromFund] = React.useState<string>("business_cash");
+  const [toFund, setToFund] = React.useState<string>("account_fund");
   const [description, setDescription] = React.useState("");
   const [reference, setReference] = React.useState("");
   const [notes, setNotes] = React.useState("");
@@ -52,13 +52,13 @@ export function AddTransactionModal({
 
   React.useEffect(() => {
     if (!open) return;
-    setMode("income");
+    setMode("transfer");
     setDate(toDateKey(new Date()));
     setAmount("");
     setCurrency("USD");
     setRate("1");
-    setFromFund("trading_income");
-    setToFund("business_cash");
+    setFromFund("business_cash");
+    setToFund("account_fund");
     setDescription("");
     setReference("");
     setNotes("");
@@ -296,3 +296,4 @@ export function AddTransactionModal({
     </Modal>
   );
 }
+

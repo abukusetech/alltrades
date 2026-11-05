@@ -4,16 +4,9 @@ import * as React from "react";
 import { Building2, User } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { useCurrentAccount } from "@/components/layout/AppShell";
 import type { AccountingTransaction, Account } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 
-/**
- * Split cash flow by account type. Uses the account_id on
- * accounting_transactions to attribute income/expenses to Maven
- * vs Personal. Transactions with no account_id are shown as
- * "Unattributed".
- */
 export function CashFlowByType({
   transactions,
   accounts,
@@ -21,7 +14,6 @@ export function CashFlowByType({
   transactions: AccountingTransaction[];
   accounts: Account[];
 }) {
-  // Build a map of account_id → type
   const accountTypeById = React.useMemo(() => {
     const m = new Map<string, string>();
     for (const a of accounts) m.set(a.id, a.account_type);
@@ -36,15 +28,19 @@ export function CashFlowByType({
     };
     for (const t of transactions) {
       if (t.reversed_by) continue;
+      
       const accId = (t as unknown as { account_id?: string | null }).account_id;
       const type = accId ? accountTypeById.get(accId) ?? "UNATTRIBUTED" : "UNATTRIBUTED";
+      
       const bucket =
         type === "MAVEN"
           ? out.MAVEN
           : type === "PERSONAL"
             ? out.PERSONAL
             : out.UNATTRIBUTED;
+            
       const amount = Number(t.amount_usd);
+      
       if (
         t.kind === "withdrawal_received" ||
         t.kind === "income" ||
@@ -54,7 +50,11 @@ export function CashFlowByType({
       } else if (t.kind === "expense" || t.kind === "account_purchase") {
         bucket.expenses += amount;
       }
-      bucket.count += 1;
+      
+      // Include allocation in the count so Maven shows transactions
+      if (t.kind !== "allocation" && t.kind !== "transfer" && t.kind !== "owner_contribution") {
+        bucket.count += 1;
+      }
     }
     return out;
   }, [transactions, accountTypeById]);
@@ -83,7 +83,7 @@ export function CashFlowByType({
         {buckets.UNATTRIBUTED.count > 0 && (
           <Row
             icon={<span className="h-3.5 w-3.5" />}
-            label="Unattributed"
+            label="General Business (Cash & Funding)"
             income={buckets.UNATTRIBUTED.income}
             expenses={buckets.UNATTRIBUTED.expenses}
             count={buckets.UNATTRIBUTED.count}
@@ -134,17 +134,10 @@ function Row({
   );
 }
 
-
 function SafeIcon({ kind }: { kind: "maven" | "personal" }) {
   const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
-  if (!mounted) {
-    return <span className="block h-3.5 w-3.5" aria-hidden="true" />;
-  }
-  if (kind === "maven") {
-    return <Building2 className="h-3.5 w-3.5 text-brand-600" />;
-  }
+  React.useEffect(() => { setMounted(true); }, []);
+  if (!mounted) return <span className="block h-3.5 w-3.5" aria-hidden="true" />;
+  if (kind === "maven") return <Building2 className="h-3.5 w-3.5 text-brand-600" />;
   return <User className="h-3.5 w-3.5 text-profit-text" />;
 }

@@ -27,7 +27,7 @@ export function WithdrawalStatusCard({ metrics }: WithdrawalStatusCardProps) {
       ? Math.min(100, (profitTowardTarget / withdrawalTarget) * 100)
       : 0;
 
-  const consistencyOk = consistencyScore <= maxConsistencyPercent;
+  const consistencyOk = consistencyScore !== null && consistencyScore <= maxConsistencyPercent;
 
   return (
     <Card>
@@ -106,3 +106,4 @@ function Row({
     </div>
   );
 }
+

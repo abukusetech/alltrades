@@ -260,12 +260,13 @@ export function TransactionLedger({
                         ? "text-loss-text"
                         : t.kind === "income" ||
                             t.kind === "withdrawal_received" ||
-                            t.kind === "refund"
+                            t.kind === "refund" ||
+                            t.kind === "owner_contribution"
                           ? "text-profit-text"
                           : "text-ink-900"
                     )}
                   >
-                    {formatCurrency(Number(t.amount_usd), { showSign: true })}
+                    {formatCurrency(t.kind === "account_purchase" || t.kind === "expense" ? -Number(t.amount_usd) : Number(t.amount_usd), { showSign: true })}
                   </TD>
                   <TD className="text-3xs text-ink-500">{t.reference ?? "—"}</TD>
                   <TD className="text-right">
@@ -351,4 +352,5 @@ function SortableTH({
     </TH>
   );
 }
+
 

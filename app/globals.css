@@ -80,6 +80,172 @@
   }
 }
 
+
+/* =========================================
+   DARK MODE — OLED PREMIUM THEME
+   ========================================= */
+.dark body {
+  background-color: #000000 !important;
+  color: #e5e5e5 !important;
+}
+
+/* Surfaces */
+.dark .bg-white,
+.dark .bg-surface {
+  background-color: #0a0a0a !important;
+}
+.dark .bg-surface-soft,
+.dark .bg-surface-muted {
+  background-color: #111111 !important;
+}
+
+/* Cards get a sleek dark grey with a subtle bright border */
+.dark .shadow-card,
+.dark .shadow-raised,
+.dark .shadow-modal {
+  background-color: #0a0a0a !important;
+  border-color: #262626 !important;
+  box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.7) !important;
+}
+
+/* Borders */
+.dark .border-border,
+.dark .border-border-strong,
+.dark .border-border-soft {
+  border-color: #262626 !important;
+}
+.dark .divide-border {
+  border-color: #262626 !important;
+}
+
+/* Typography */
+.dark .text-ink-900,
+.dark .text-ink-800 {
+  color: #ffffff !important;
+}
+.dark .text-ink-700,
+.dark .text-ink-600 {
+  color: #a3a3a3 !important;
+}
+.dark .text-ink-500,
+.dark .text-ink-400 {
+  color: #737373 !important;
+}
+
+/* --- NEON STATUS ACCENTS --- */
+/* Profit (Neon Green) */
+.dark .bg-profit-bg {
+  background-color: #022c22 !important;
+  border-color: #064e3b !important;
+}
+.dark .text-profit-text {
+  color: #4ade80 !important;
+}
+.dark .bg-profit {
+  background-color: #22c55e !important;
+}
+
+/* Loss (Vibrant Red) */
+.dark .bg-loss-bg {
+  background-color: #450a0a !important;
+  border-color: #7f1d1d !important;
+}
+.dark .text-loss-text {
+  color: #f87171 !important;
+}
+.dark .bg-loss {
+  background-color: #ef4444 !important;
+}
+
+/* Warn (Amber) */
+.dark .bg-warn-bg {
+  background-color: #451a03 !important;
+  border-color: #78350f !important;
+}
+.dark .text-warn-text {
+  color: #fbbf24 !important;
+}
+
+/* Brand (Electric Blue) */
+.dark .bg-brand-50 {
+  background-color: #172554 !important;
+  border-color: #1e3a8a !important;
+}
+.dark .text-brand-700,
+.dark .text-brand-600 {
+  color: #60a5fa !important;
+}
+.dark .bg-brand-600 {
+  background-color: #2563eb !important;
+}
+
+/* Inputs and Forms */
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  border-color: #404040 !important;
+}
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus {
+  border-color: #3b82f6 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Tables and Lists */
+.dark .hover\:bg-surface-soft:hover {
+  background-color: #111111 !important;
+}
+.dark .bg-surface-muted {
+  background-color: #171717 !important;
+}
+
+/* --- BADGE AND PILL FIXES FOR DARK MODE --- */
+.dark .bg-ink-50,
+.dark .bg-ink-100 {
+  background-color: #262626 !important;
+  color: #e5e5e5 !important;
+}
+
+/* Fix the text inside generic badges */
+.dark .bg-ink-50.text-ink-700,
+.dark .bg-ink-100.text-ink-700,
+.dark .text-ink-700 {
+  color: #d4d4d4 !important;
+}
+
+/* Specifically target the Badge component's neutral tone */
+.dark .badge-neutral,
+.dark span[class*="bg-ink-100"] {
+  background-color: #262626 !important;
+  border-color: #404040 !important;
+  color: #ffffff !important;
+}
+
+/* Target the colored badges to make sure text pops */
+.dark span[class*="bg-brand-50"] {
+  background-color: #172554 !important;
+  color: #60a5fa !important;
+  border-color: #1e3a8a !important;
+}
+.dark span[class*="bg-profit-bg"] {
+  background-color: #022c22 !important;
+  color: #4ade80 !important;
+  border-color: #064e3b !important;
+}
+.dark span[class*="bg-loss-bg"] {
+  background-color: #450a0a !important;
+  color: #f87171 !important;
+  border-color: #7f1d1d !important;
+}
+.dark span[class*="bg-warn-bg"] {
+  background-color: #451a03 !important;
+  color: #fbbf24 !important;
+  border-color: #78350f !important;
+}
 @layer utilities {
   input[type="number"]::-webkit-outer-spin-button,
   input[type="number"]::-webkit-inner-spin-button {
@@ -100,3 +266,7 @@
     opacity: 0.8;
   }
 }
+
+
+
+

@@ -55,9 +55,11 @@ export interface SidebarProps {
   onClose: () => void;
   onSignOut: () => void | Promise<void>;
   userEmail?: string | null;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export function Sidebar({ open, onClose, onSignOut, userEmail }: SidebarProps) {
+export function Sidebar({ open, onClose, onSignOut, userEmail, collapsed, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -72,8 +74,9 @@ export function Sidebar({ open, onClose, onSignOut, userEmail }: SidebarProps) {
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-brand-700 text-white transition-transform lg:translate-x-0",
-          open ? "translate-x-0" : "-translate-x-full"
+          "fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-brand-700 text-white transition-transform duration-300",
+          open ? "translate-x-0" : "-translate-x-full",
+          collapsed ? "lg:-translate-x-full" : "lg:translate-x-0"
         )}
         aria-label="Primary navigation"
       >
@@ -210,3 +213,4 @@ export function AlltradesMark({ className }: { className?: string }) {
     </svg>
   );
 }
+

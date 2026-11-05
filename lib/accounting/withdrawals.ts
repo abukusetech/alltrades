@@ -8,12 +8,6 @@ import type {
   AccountingSettings,
 } from "@/lib/types";
 
-// ---------- Pure calculations ----------
-
-/**
- * Compute the expected trader net payout:
- *   gross × (trader_share_percent / 100) − fee
- */
 export function expectedNetPayout(
   grossRequested: number,
   traderSharePercent: number,
@@ -23,20 +17,14 @@ export function expectedNetPayout(
   return Number((traderCut - feeAmount).toFixed(2));
 }
 
-/** Trader cut before fees. */
 export function traderCut(gross: number, traderSharePercent: number): number {
   return Number((gross * (traderSharePercent / 100)).toFixed(2));
 }
 
-/** Firm cut. */
 export function firmCut(gross: number, firmSharePercent: number): number {
   return Number((gross * (firmSharePercent / 100)).toFixed(2));
 }
 
-/**
- * Compute the 50/30/20 style allocation preview.
- * Returns the three amounts based on the settings percentages.
- */
 export function previewAllocation(
   netAmount: number,
   settings: Pick<
@@ -60,8 +48,6 @@ export function previewAllocation(
   };
 }
 
-// ---------- Withdrawal workflow ----------
-
 export interface NewWithdrawalInput {
   prop_firm: string;
   account_size: number | null;
@@ -80,9 +66,7 @@ export function buildWithdrawalFromInput(input: NewWithdrawalInput): Omit<
   AccountingWithdrawal,
   "id" | "user_id" | "created_at" | "updated_at"
 > {
-  const firmSharePercent = Number(
-    (100 - input.trader_share_percent).toFixed(2)
-  );
+  const firmSharePercent = Number((100 - input.trader_share_percent).toFixed(2));
   const expected = expectedNetPayout(
     input.gross_requested,
     input.trader_share_percent,
@@ -132,7 +116,6 @@ export async function updateWithdrawalRecord(
   id: string,
   values: Partial<AccountingWithdrawal>
 ): Promise<AccountingWithdrawal> {
-  // Auto-recompute expected_net_payout when gross/trader_share/fee change
   const merged = { ...values };
   if (
     merged.gross_requested !== undefined ||
@@ -195,17 +178,6 @@ export async function getAllocationForWithdrawal(
   return (data as AccountingAllocation | null) ?? null;
 }
 
-/**
- * Mark a withdrawal as paid. Records the actual net received amount.
- * This does NOT post any ledger entries — those come from the allocation step.
- */
-/**
- * Mark a withdrawal as paid and post the corresponding INCOME event.
- * This is the moment the money actually enters your books:
- *   Debit  business_cash      (money in)
- *   Credit trading_income     (source)
- * The later allocation step then spends from business_cash into funds.
- */
 export async function markWithdrawalPaid(
   supabase: SupabaseClient,
   userId: string,
@@ -213,7 +185,6 @@ export async function markWithdrawalPaid(
   actual_net_received: number,
   received_date: string
 ): Promise<AccountingWithdrawal> {
-  // 1. Update the withdrawal row
   const { data, error } = await supabase
     .from("accounting_withdrawals")
     .update({
@@ -228,9 +199,6 @@ export async function markWithdrawalPaid(
 
   if (error) throw error;
 
-  // 2. Post the withdrawal_received transaction (income event).
-  //    Idempotent: if a transaction with this linked_withdrawal_id and
-  //    kind='withdrawal_received' already exists, we skip.
   const { data: existing } = await supabase
     .from("accounting_transactions")
     .select("id")
@@ -256,18 +224,11 @@ export async function markWithdrawalPaid(
         reference: data.reference,
         notes: data.notes,
         linked_withdrawal_id: id,
+        account_id: data.account_id, // <--- LINK TO MAVEN
       },
       [
-        {
-          fund_key: "business_cash",
-          direction: "debit",
-          amount: actual_net_received,
-        },
-        {
-          fund_key: "trading_income",
-          direction: "credit",
-          amount: actual_net_received,
-        },
+        { fund_key: "business_cash", direction: "debit", amount: actual_net_received },
+        { fund_key: "trading_income", direction: "credit", amount: actual_net_received },
       ]
     );
   }
@@ -275,10 +236,6 @@ export async function markWithdrawalPaid(
   return data as AccountingWithdrawal;
 }
 
-/**
- * Reverse the income event for a withdrawal that was marked paid.
- * Used when you correct a mistaken "paid" status back to approved.
- */
 export async function reverseWithdrawalIncome(
   supabase: SupabaseClient,
   userId: string,
@@ -298,5 +255,3 @@ export async function reverseWithdrawalIncome(
   const { reverseTransaction } = await import("./ledger");
   await reverseTransaction(supabase, userId, txn.id, reason);
 }
-
-

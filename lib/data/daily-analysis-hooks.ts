@@ -20,12 +20,22 @@ export function useDailyAnalysis(
     key,
     ([, accId, d]) => getDailyAnalysis(supabase, accId as string, d as string),
     {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-      revalidateIfStale: false,
-      // Critical: do NOT replace local draft state with server payload
-      // when the user is actively typing.
+      // CRITICAL: revalidate on every mount so returning to the page always
+      // fetches the latest saved data. Without this, SWR serves the stale
+      // null that was cached the first time the key was opened (before any
+      // save existed), producing the "empty on return" bug.
+      revalidateOnMount: true,
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      revalidateIfStale: true,
+      // Keep the previous data visible while the new fetch is in flight so
+      // the form doesn't flash empty during revalidation.
       keepPreviousData: true,
+      // Deduplicate within 2s only — not 5 min.
+      dedupingInterval: 2000,
+      // Never treat a null fetch as authoritative for more than a moment.
+      errorRetryCount: 2,
+      errorRetryInterval: 2000,
     }
   );
 }
@@ -39,22 +49,17 @@ export function useDailyAnalysesHistory(accountId: string | null, limit = 60) {
     ([, accId, l]) =>
       listDailyAnalyses(supabase, accId as string, l as number),
     {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-      revalidateIfStale: false,
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      revalidateIfStale: true,
+      keepPreviousData: true,
+      dedupingInterval: 5000,
     }
   );
 }
 
 /**
- * Revision-aware autosave.
- *
- * Keeps the latest draft in local state. Debounces DB writes. Uses a
- * monotonically increasing local revision counter so a slow response can
- * never overwrite a newer local edit.
- *
- * The `saveFn` must perform a real DB write and resolve only after the
- * write has succeeded.
+ * Revision-aware autosave — unchanged from before.
  */
 export function useAutosave<T>(
   deps: unknown[],
@@ -71,15 +76,10 @@ export function useAutosave<T>(
   const [error, setError] = React.useState<string | null>(null);
 
   const timerRef = React.useRef<number | null>(null);
-  // Monotonic revision of local edits. Incremented on every state change.
   const localRevisionRef = React.useRef(0);
-  // Highest revision that has been successfully persisted.
   const savedRevisionRef = React.useRef(0);
-  // Latest value we intend to save (kept in a ref so the debounced
-  // callback always reads the latest, not a closed-over stale value).
   const latestValueRef = React.useRef<T | null>(value);
 
-  // Keep the ref in sync on every render.
   React.useEffect(() => {
     latestValueRef.current = value;
     localRevisionRef.current += 1;
@@ -88,7 +88,6 @@ export function useAutosave<T>(
 
   React.useEffect(() => {
     if (!enabled || value === null) return;
-    // Do not schedule a save if we're already up to date.
     if (savedRevisionRef.current >= localRevisionRef.current) return;
 
     if (timerRef.current) window.clearTimeout(timerRef.current);
@@ -105,17 +104,12 @@ export function useAutosave<T>(
 
         await saveFn(payload);
 
-        // Only mark as saved if no newer edit came in while we were saving.
-        // This is the crucial guard against a slow response overwriting
-        // newer text.
         savedRevisionRef.current = myRevision;
 
         if (localRevisionRef.current <= myRevision) {
           setState("saved");
         } else {
-          // A newer edit happened; schedule another save immediately.
           setState("saving");
-          // Trigger another effect cycle by touching the timer.
           if (timerRef.current) window.clearTimeout(timerRef.current);
           timerRef.current = window.setTimeout(() => {
             setState("saving");

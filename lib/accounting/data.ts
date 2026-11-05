@@ -12,8 +12,6 @@ import type {
 } from "@/lib/types";
 import { computeBalances } from "./ledger";
 
-// ---------- Funds ----------
-
 export async function listFunds(
   supabase: SupabaseClient,
   userId: string
@@ -26,8 +24,6 @@ export async function listFunds(
   if (error) throw error;
   return (data ?? []) as AccountingFund[];
 }
-
-// ---------- Transactions + Ledger ----------
 
 export async function listTransactions(
   supabase: SupabaseClient,
@@ -55,7 +51,6 @@ export async function listLedger(
   userId: string,
   opts: { from?: string; to?: string } = {}
 ): Promise<AccountingLedgerEntry[]> {
-  // Join with transactions to filter by date
   let q = supabase
     .from("accounting_ledger")
     .select("*, accounting_transactions!inner(occurred_on, reversed_by)")
@@ -67,7 +62,6 @@ export async function listLedger(
   const { data, error } = await q;
   if (error) throw error;
 
-  // Exclude ledger rows whose parent transaction has been reversed
   return ((data ?? []) as (AccountingLedgerEntry & {
     accounting_transactions?: { reversed_by: string | null };
   })[])
@@ -90,8 +84,6 @@ export async function getFundBalances(
   );
   return { funds, balances };
 }
-
-// ---------- Withdrawals ----------
 
 export async function listWithdrawals(
   supabase: SupabaseClient,
@@ -150,8 +142,6 @@ export async function deleteWithdrawal(
   if (error) throw error;
 }
 
-// ---------- Allocations ----------
-
 export async function getAllocation(
   supabase: SupabaseClient,
   userId: string,
@@ -180,8 +170,6 @@ export async function createAllocation(
   if (error) throw error;
   return data as AccountingAllocation;
 }
-
-// ---------- Account purchases ----------
 
 export async function listPurchases(
   supabase: SupabaseClient,
@@ -239,8 +227,6 @@ export async function deletePurchase(
     .eq("user_id", userId);
   if (error) throw error;
 }
-
-// ---------- Goals ----------
 
 export async function listGoals(
   supabase: SupabaseClient,
@@ -300,8 +286,6 @@ export async function deleteGoal(
   if (error) throw error;
 }
 
-// ---------- Settings ----------
-
 export async function getSettings(
   supabase: SupabaseClient,
   userId: string
@@ -329,35 +313,11 @@ export async function upsertSettings(
   return data as AccountingSettings;
 }
 
-/**
- * Hard-delete a transaction and its ledger entries.
- * Only allowed when:
- *   - the transaction is not reversed
- *   - the transaction is not a reversal of another (kind != 'correction')
- *   - the transaction has not itself been reversed by another entry
- * Deletes both ledger rows and the transaction row in one operation.
- */
-/**
- * Hard-delete a transaction and its ledger entries.
- *
- * Rules:
- * 1. If the transaction is a *replacement* (has `reverses` set), we delete
- *    the whole amendment chain: the replacement, its reversal, and we
- *    un-reverse the original so it becomes active again. Result: you're
- *    back to the pre-edit state.
- * 2. Otherwise, if the transaction has been reversed, we refuse — you must
- *    reverse its reversal chain, not delete it.
- * 3. Reversal entries (kind === 'correction') cannot be deleted individually
- *    UNLESS they belong to an amendment chain that we're collapsing (rule 1).
- * 4. Standalone transactions (income, expense, transfer) can be deleted
- *    freely as long as they haven't been reversed.
- */
 export async function deleteTransaction(
   supabase: SupabaseClient,
   userId: string,
   id: string
 ): Promise<void> {
-  // 1. Load the transaction
   const { data: txn, error: loadErr } = await supabase
     .from("accounting_transactions")
     .select("*")
@@ -367,12 +327,8 @@ export async function deleteTransaction(
 
   if (loadErr || !txn) throw loadErr ?? new Error("Transaction not found");
 
-  // ---------- CASE 1: this is a replacement (has `reverses`) ----------
-  // Collapse the whole amendment chain.
   if (txn.reverses) {
     const originalId = txn.reverses;
-
-    // Load the original
     const { data: original, error: origErr } = await supabase
       .from("accounting_transactions")
       .select("*")
@@ -380,13 +336,7 @@ export async function deleteTransaction(
       .eq("user_id", userId)
       .single();
 
-    if (origErr || !original) {
-      throw new Error("Could not find the original transaction of this amendment.");
-    }
-
-    // Find the reversal that points at the original AND was created between
-    // the original and this replacement. It's the "correction" whose
-    // `reverses` field is the original.
+    if (origErr || !original) throw new Error("Could not find the original transaction.");
     const { data: reversalRows, error: revErr } = await supabase
       .from("accounting_transactions")
       .select("*")
@@ -396,109 +346,34 @@ export async function deleteTransaction(
 
     if (revErr) throw revErr;
 
-    // Delete ledger entries for the replacement
-    const { error: ledgerReplErr } = await supabase
-      .from("accounting_ledger")
-      .delete()
-      .eq("transaction_id", txn.id)
-      .eq("user_id", userId);
-    if (ledgerReplErr) throw ledgerReplErr;
+    await supabase.from("accounting_ledger").delete().eq("transaction_id", txn.id).eq("user_id", userId);
+    await supabase.from("accounting_transactions").delete().eq("id", txn.id).eq("user_id", userId);
 
-    // Delete the replacement row
-    const { error: delReplErr } = await supabase
-      .from("accounting_transactions")
-      .delete()
-      .eq("id", txn.id)
-      .eq("user_id", userId);
-    if (delReplErr) throw delReplErr;
-
-    // Delete the reversal(s) and their ledger entries
     if (reversalRows && reversalRows.length > 0) {
       const reversalIds = reversalRows.map((r) => r.id);
-
-      const { error: ledgerRevErr } = await supabase
-        .from("accounting_ledger")
-        .delete()
-        .in("transaction_id", reversalIds)
-        .eq("user_id", userId);
-      if (ledgerRevErr) throw ledgerRevErr;
-
-      const { error: delRevErr } = await supabase
-        .from("accounting_transactions")
-        .delete()
-        .in("id", reversalIds)
-        .eq("user_id", userId);
-      if (delRevErr) throw delRevErr;
+      await supabase.from("accounting_ledger").delete().in("transaction_id", reversalIds).eq("user_id", userId);
+      await supabase.from("accounting_transactions").delete().in("id", reversalIds).eq("user_id", userId);
     }
 
-    // Restore the original — clear its `reversed_by`
-    const { error: restoreErr } = await supabase
-      .from("accounting_transactions")
-      .update({ reversed_by: null })
-      .eq("id", originalId)
-      .eq("user_id", userId);
-    if (restoreErr) throw restoreErr;
-
+    await supabase.from("accounting_transactions").update({ reversed_by: null }).eq("id", originalId).eq("user_id", userId);
     return;
   }
 
-  // ---------- CASE 2: original was reversed ----------
-  if (txn.reversed_by) {
-    throw new Error(
-      "This transaction has been reversed or amended. Delete the replacement instead — that will collapse the amendment chain."
-    );
-  }
+  if (txn.reversed_by) throw new Error("This transaction has been reversed or amended. Delete the replacement instead.");
+  if (txn.kind === "correction") throw new Error("Reversal entries cannot be deleted individually.");
 
-  // ---------- CASE 3: this is a standalone reversal (kind = correction) ----------
-  if (txn.kind === "correction") {
-    throw new Error(
-      "Reversal entries cannot be deleted individually. Delete the replacement that created it, or leave it as an audit record."
-    );
-  }
-
-  // ---------- CASE 4: has children that reference it ----------
   const { data: children } = await supabase
     .from("accounting_transactions")
     .select("id")
     .eq("reverses", id)
     .eq("user_id", userId);
 
-  if (children && children.length > 0) {
-    throw new Error(
-      "This transaction has linked reversals or replacements. Delete the replacement instead."
-    );
-  }
+  if (children && children.length > 0) throw new Error("This transaction has linked reversals or replacements. Delete the replacement instead.");
 
-  // ---------- CASE 5: plain delete ----------
-  const { error: ledgerErr } = await supabase
-    .from("accounting_ledger")
-    .delete()
-    .eq("transaction_id", id)
-    .eq("user_id", userId);
-  if (ledgerErr) throw ledgerErr;
-
-  const { error: txnErr } = await supabase
-    .from("accounting_transactions")
-    .delete()
-    .eq("id", id)
-    .eq("user_id", userId);
-  if (txnErr) throw txnErr;
+  await supabase.from("accounting_ledger").delete().eq("transaction_id", id).eq("user_id", userId);
+  await supabase.from("accounting_transactions").delete().eq("id", id).eq("user_id", userId);
 }
 
-/**
- * Post a profit allocation and record the allocation row.
- * Called only after the user has confirmed the preview.
- * Posts three fund movements inside a single transaction event so the
- * ledger stays balanced.
- */
-/**
- * Post a profit allocation and record the allocation row.
- * Called only after the user confirms the preview.
- *
- * Each posting moves money from business_cash into the target fund.
- * The total of the three debits equals the credit from business_cash,
- * so the double-entry ledger stays balanced.
- */
 export async function createAllocationWithPostings(
   supabase: SupabaseClient,
   userId: string,
@@ -512,11 +387,9 @@ export async function createAllocationWithPostings(
     account_fund_amount: number;
     savings_amount: number;
     business_amount: number;
-    /** Where the money comes from. Defaults to business_cash (Maven). */
     source_fund?: "business_cash" | "personal_broker_cash";
   }
 ): Promise<AccountingAllocation> {
-  // 1. Idempotency: refuse if an allocation already exists for this withdrawal
   const { data: existing } = await supabase
     .from("accounting_allocations")
     .select("id")
@@ -524,21 +397,11 @@ export async function createAllocationWithPostings(
     .eq("withdrawal_id", args.withdrawal_id)
     .maybeSingle();
 
-  if (existing) {
-    throw new Error("This withdrawal has already been allocated.");
-  }
+  if (existing) throw new Error("This withdrawal has already been allocated.");
 
-  // 2. Sanity check: the three amounts should sum to total_amount
-  const sum = Number(
-    (args.account_fund_amount + args.savings_amount + args.business_amount).toFixed(2)
-  );
-  if (Math.abs(sum - args.total_amount) > 0.02) {
-    throw new Error(
-      `Allocation amounts ($${sum.toFixed(2)}) do not sum to total ($${args.total_amount.toFixed(2)}).`
-    );
-  }
+  const sum = Number((args.account_fund_amount + args.savings_amount + args.business_amount).toFixed(2));
+  if (Math.abs(sum - args.total_amount) > 0.02) throw new Error(`Allocation amounts ($${sum.toFixed(2)}) do not sum to total ($${args.total_amount.toFixed(2)}).`);
 
-  // 3. Record the allocation metadata
   const { data: alloc, error: allocErr } = await supabase
     .from("accounting_allocations")
     .insert({
@@ -559,8 +422,9 @@ export async function createAllocationWithPostings(
 
   if (allocErr) throw allocErr;
 
-  // 4. Post the ledger transaction.
-  //    Total debits = total credit = total_amount.
+  // Fetch the withdrawal to get its account_id so the allocation is linked to Maven
+  const { data: wd } = await supabase.from("accounting_withdrawals").select("account_id").eq("id", args.withdrawal_id).single();
+
   const { postTransaction } = await import("./ledger");
   await postTransaction(
     supabase,
@@ -571,31 +435,15 @@ export async function createAllocationWithPostings(
       description: `Profit allocation (${args.account_fund_percent}/${args.savings_percent}/${args.business_percent})`,
       amount: args.total_amount,
       linked_withdrawal_id: args.withdrawal_id,
+      account_id: wd?.account_id ?? null, // <--- LINK TO MAVEN
     },
     [
-      {
-        fund_key: "account_fund",
-        direction: "debit",
-        amount: args.account_fund_amount,
-      },
-      {
-        fund_key: "personal_savings",
-        direction: "debit",
-        amount: args.savings_amount,
-      },
-      {
-        fund_key: "business_operating",
-        direction: "debit",
-        amount: args.business_amount,
-      },
-      {
-        fund_key: args.source_fund ?? "business_cash",
-        direction: "credit",
-        amount: args.total_amount,
-      },
+      { fund_key: "account_fund", direction: "debit", amount: args.account_fund_amount },
+      { fund_key: "personal_savings", direction: "debit", amount: args.savings_amount },
+      { fund_key: "business_operating", direction: "debit", amount: args.business_amount },
+      { fund_key: args.source_fund ?? "business_cash", direction: "credit", amount: args.total_amount },
     ]
   );
 
   return alloc as AccountingAllocation;
 }
-

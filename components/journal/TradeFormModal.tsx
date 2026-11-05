@@ -152,6 +152,13 @@ function initialState(t?: Trade | null): FormState {
 function prefillFromAnalysis(form: FormState, analysis: DailyAnalysis): FormState {
   const next = { ...form };
   if (!next.instrument && analysis.instrument) next.instrument = analysis.instrument;
+  // Prefill lot size and risk amount from the computed position (if present)
+  if (!next.lot_size && analysis.computed_lot_size !== null && analysis.computed_lot_size !== undefined) {
+    next.lot_size = String(analysis.computed_lot_size);
+  }
+  if (!next.risk_amount && analysis.computed_risk_amount !== null && analysis.computed_risk_amount !== undefined) {
+    next.risk_amount = String(analysis.computed_risk_amount);
+  }
   if (!next.direction && analysis.planned_direction) {
     next.direction =
       analysis.planned_direction === "BUY"
@@ -933,6 +940,7 @@ function Section({
     </section>
   );
 }
+
 
 
 

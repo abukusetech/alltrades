@@ -14,7 +14,7 @@ export function ConsistencyStats({
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <Stat
         label="Consistency Score"
-        value={`${metrics.consistencyScore.toFixed(1)}%`}
+        value={metrics.consistencyScore !== null ? `${metrics.consistencyScore.toFixed(1)}%` : "N/A"}
       />
       <Stat
         label="Average Trades / Week"
@@ -44,3 +44,4 @@ function Stat({ label, value }: { label: string; value: string }) {
     </Card>
   );
 }
+

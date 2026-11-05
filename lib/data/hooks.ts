@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import * as React from "react";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { createClient } from "@/lib/supabase/client";
 import { listTrades } from "./trades";
 import { listWithdrawals } from "./withdrawals";
@@ -57,7 +57,6 @@ export function useWeeklyReview(
 export function useTradesForFilter(
   accounts: { id: string; account_type: string }[]
 ) {
-  // Stable dependency: only changes when the actual set of IDs changes.
   const idsKey = React.useMemo(() => {
     if (accounts.length === 0) return null;
     return accounts.map((a) => a.id).sort().join(",");
@@ -103,15 +102,108 @@ export function useWithdrawalsForFilter(accounts: { id: string }[]) {
 }
 
 /**
- * Revalidates all account-scoped data.
+ * Revalidates all trade / withdrawal / analysis caches — both the
+ * single-account keys AND the filter-based keys used by the Dashboard.
+ * Called from JournalClient after save/edit/delete so the Dashboard
+ * updates on the same tab immediately.
  */
 export function useRevalidateAccount(accountId: string | null) {
-  const { mutate: mTrades } = useSWR(swrKeys.trades(accountId));
-  const { mutate: mWithdrawals } = useSWR(swrKeys.withdrawals(accountId));
-  const { mutate: mAnalyses } = useSWR(swrKeys.analyses(accountId));
+  const { mutate } = useSWRConfig();
 
   return React.useCallback(async () => {
-    await Promise.all([mTrades(), mWithdrawals(), mAnalyses()]);
-  }, [mTrades, mWithdrawals, mAnalyses]);
+    // Force-revalidate every matching key: single-account AND filter-based.
+    await Promise.all([
+      mutate(
+        (key) =>
+          Array.isArray(key) &&
+          ["trades", "tradesFilter", "withdrawals", "withdrawalsFilter", "analyses"].includes(
+            key[0] as string
+          ),
+        undefined,
+        { revalidate: true }
+      ),
+      mutate(swrKeys.trades(accountId)),
+      mutate(swrKeys.withdrawals(accountId)),
+      mutate(swrKeys.analyses(accountId)),
+    ]);
+  }, [mutate, accountId]);
 }
 
+/**
+ * Realtime trade sync.
+ *
+ * Subscribes to INSERT / UPDATE / DELETE on `trades` filtered by the
+ * authenticated user. When any event arrives:
+ *   1. Invalidates every trade-related SWR cache (single-account + filter).
+ *   2. Invalidates withdrawal caches too (dashboard uses withdrawals for
+ *      account balance and consistency cycle). Analyses and accounts refresh
+ *      on navigation, which is fine.
+ *
+ * The subscription is created once per user and torn down on unmount /
+ * user change. Reconnect is handled by supabase-js internally — when the
+ * socket drops and returns, we re-fetch to catch anything missed.
+ *
+ * Call this once (e.g. in AppShell). It is a no-op when userId is null.
+ */
+export function useRealtimeTradesSync(userId: string | null) {
+  const { mutate } = useSWRConfig();
+
+  React.useEffect(() => {
+    if (!userId) return;
+
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    const invalidateAll = () => {
+      void mutate(
+        (key) =>
+          Array.isArray(key) &&
+          ["trades", "tradesFilter", "withdrawals", "withdrawalsFilter"].includes(
+            key[0] as string
+          ),
+        undefined,
+        { revalidate: true }
+      );
+    };
+
+    // Ensure the socket is subscribed before we create the channel —
+    // otherwise events fired during the initial connect can be missed.
+    (async () => {
+      try {
+        await supabase.realtime.setAuth();
+      } catch {
+        // Not fatal — some environments set auth automatically.
+      }
+      if (cancelled) return;
+
+      channel = supabase
+        .channel(`trades-realtime-${userId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*", // INSERT | UPDATE | DELETE
+            schema: "public",
+            table: "trades",
+            filter: `user_id=eq.${userId}`,
+          },
+          () => {
+            invalidateAll();
+          }
+        )
+        .subscribe((status) => {
+          // After a reconnect the socket replays events, but if any were
+          // missed during the outage we want a full refetch too.
+          if (status === "SUBSCRIBED") {
+            invalidateAll();
+          }
+        });
+    })();
+
+    return () => {
+      cancelled = true;
+      if (channel) {
+        void supabase.removeChannel(channel);
+      }
+    };
+  }, [userId, mutate]);
+}

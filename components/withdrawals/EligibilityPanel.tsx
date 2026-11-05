@@ -10,7 +10,7 @@ export interface EligibilityPanelProps {
 }
 
 export function EligibilityPanel({ metrics, onRecord }: EligibilityPanelProps) {
-  const consistencyOk = metrics.consistencyScore <= metrics.maxConsistencyPercent;
+  const consistencyOk = metrics.consistencyScore !== null && metrics.consistencyScore <= metrics.maxConsistencyPercent;
   const eligible = metrics.withdrawalEligible;
 
   return (
@@ -101,3 +101,4 @@ function GateRow({
     </div>
   );
 }
+

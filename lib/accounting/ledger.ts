@@ -39,6 +39,7 @@ export async function postTransaction(
     notes?: string | null;
     linked_withdrawal_id?: string | null;
     linked_purchase_id?: string | null;
+    account_id?: string | null;
     reverses?: string | null;
   },
   postings: Posting[]
@@ -76,6 +77,7 @@ export async function postTransaction(
       notes: payload.notes ?? null,
       linked_withdrawal_id: payload.linked_withdrawal_id ?? null,
       linked_purchase_id: payload.linked_purchase_id ?? null,
+      account_id: payload.account_id ?? null,
       reverses: payload.reverses ?? null,
     })
     .select("*")
@@ -325,3 +327,105 @@ export async function amendTransaction(
 
   return { replacement, reversal };
 }
+
+/**
+ * Record an Owner Contribution (Personal Funding).
+ * Debit: Business Cash (or Expense if direct)
+ * Credit: Owner's Capital
+ */
+export async function postOwnerContribution(
+  supabase: SupabaseClient,
+  userId: string,
+  args: {
+    occurred_on: string;
+    amount: number;
+    description: string;
+    source_fund: "personal_savings" | "personal_spending" | "personal_broker_cash";
+    dest_fund: "business_cash" | "business_expenses";
+    reference?: string | null;
+    notes?: string | null;
+  }
+) {
+  const { postTransaction } = await import("./ledger");
+  
+  // If the destination is an expense, it means it bypassed cash.
+  // Otherwise, it increases Business Cash.
+  return postTransaction(
+    supabase,
+    userId,
+    {
+      occurred_on: args.occurred_on,
+      kind: "owner_contribution",
+      description: args.description,
+      amount: args.amount,
+      reference: args.reference ?? null,
+      notes: args.notes ?? null,
+    },
+    [
+      { fund_key: args.dest_fund, direction: "debit", amount: args.amount },
+      { fund_key: "owner_capital", direction: "credit", amount: args.amount },
+    ]
+  );
+}
+
+/**
+ * Record an Account Purchase.
+ * Debit: Account Purchase Expense
+ * Credit: Business Cash (or Owner's Capital if paid personally)
+ */
+export async function postAccountPurchase(
+  supabase: SupabaseClient,
+  userId: string,
+  args: {
+    occurred_on: string;
+    amount: number;
+    description: string;
+    payment_source: "business_cash" | "owner_capital" | "account_fund";
+    reference?: string | null;
+    notes?: string | null;
+  }
+) {
+  // --- ENFORCE FUNDING LIMITS ---
+  // If paying from account_fund, ensure there is enough money in it first.
+  if (args.payment_source === "account_fund") {
+    const { data: ledger } = await supabase
+      .from("accounting_ledger")
+      .select("direction, amount")
+      .eq("user_id", userId)
+      .eq("fund_key", "account_fund");
+
+    const balance = (ledger || []).reduce((sum, entry) => {
+      return sum + (entry.direction === "debit" ? Number(entry.amount) : -Number(entry.amount));
+    }, 0);
+
+    if (balance < args.amount) {
+      throw new Error(
+        `Insufficient funds in Account Fund. Required: ${args.amount.toFixed(2)}, Available: ${balance.toFixed(2)}. Move funds from Business Cash first.`
+      );
+    }
+  }
+
+  const { postTransaction } = await import("./ledger");
+  
+  return postTransaction(
+    supabase,
+    userId,
+    {
+      occurred_on: args.occurred_on,
+      kind: "account_purchase",
+      description: args.description,
+      amount: args.amount,
+      reference: args.reference ?? null,
+      notes: args.notes ?? null,
+    },
+    [
+      { fund_key: "account_purchase_expense", direction: "debit", amount: args.amount },
+      { fund_key: args.payment_source, direction: "credit", amount: args.amount },
+    ]
+  );
+}
+
+
+
+
+

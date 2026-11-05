@@ -3,6 +3,7 @@
 
 import type { Trade, Account, Withdrawal } from "@/lib/types";
 import { parseNumberOrNull, startOfMonth, toDateKey } from "@/lib/utils";
+import { computeConsistency } from "@/lib/consistency";
 
 // ---------- Types ----------
 
@@ -339,21 +340,16 @@ export function computePayoutEligibility(
   const target = (Number(account.starting_capital) || 0) * (targetPct / 100);
   const eligibleByProfit = totalPnL >= target;
 
-  // ---- Consistency (20% rule) ----
-  const daily = new Map<string, number>();
-  for (const t of trades) {
-    daily.set(
-      t.trade_date,
-      (daily.get(t.trade_date) ?? 0) + (Number(t.profit_loss) || 0)
-    );
-  }
-  const days = Array.from(daily.values());
-  const totalProfit = days.reduce((s, v) => s + Math.max(v, 0), 0);
-  const biggestDay = days.reduce((s, v) => Math.max(s, v), 0);
-  const consistencyScore =
-    totalProfit > 0 ? (biggestDay / totalProfit) * 100 : 0;
+  // ---- Consistency (20% rule, Maven Instant Funding) ----
+  // Scoped to the active payout cycle so past cycles do not pollute the score.
   const maxConsistency = Number(account.max_consistency_percent) || 20;
-  const eligibleByConsistency = consistencyScore <= maxConsistency;
+  const consistency = computeConsistency({
+    trades,
+    cycleStartDate: cycleStartKey,
+    maxAllowed: maxConsistency,
+  });
+  const consistencyScore = consistency.score;
+  const eligibleByConsistency = consistency.eligible;
 
   const split = computeProfitSplit(account, trades, withdrawals);
 
@@ -594,6 +590,8 @@ export function computePerformanceScore(
 
   return { total: Math.round(total), breakdown };
 }
+
+
 
 
 

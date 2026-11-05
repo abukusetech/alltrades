@@ -6,6 +6,7 @@ import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { ToastProvider } from "@/components/ui/Toast";
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeTradesSync } from "@/lib/data/hooks";
 import type { Account, Profile, AccountType } from "@/lib/types";
 
 const SELECTED_ACCOUNT_KEY = "alltrades.selectedAccountId";
@@ -101,6 +102,12 @@ export function AppShell({
   const router = useRouter();
   const supabase = React.useMemo(() => createClient(), []);
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
+
+  // Global realtime sync — one subscription for the whole app, torn down on
+  // sign-out. Any INSERT/UPDATE/DELETE on `trades` for this user invalidates
+  // the Dashboard, Journal, Analytics and Calendar caches instantly.
+  useRealtimeTradesSync(profile.id);
 
   // Warm the router after initial paint.
   React.useEffect(() => {
@@ -230,10 +237,13 @@ export function AppShell({
             onClose={() => setSidebarOpen(false)}
             onSignOut={onSignOut}
             userEmail={profile.email}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
           />
-          <div className="lg:pl-64">
+          <div className={sidebarCollapsed ? "lg:pl-0" : "lg:pl-64"}>
             <Topbar
               onOpenSidebar={() => setSidebarOpen(true)}
+              onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
               userName={displayName}
               accounts={accounts}
               currentAccountId={currentAccountId}
@@ -250,6 +260,8 @@ export function AppShell({
     </AccountContext.Provider>
   );
 }
+
+
 
 
 

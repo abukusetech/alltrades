@@ -62,7 +62,11 @@ export function WeekStats({ week }: WeekStatsProps) {
       />
       <Stat
         label="Consistency score"
-        value={formatPercent(week.consistencyScore, 1)}
+        value={
+          week.consistencyScore != null
+            ? formatPercent(week.consistencyScore, 1)
+            : "—"
+        }
       />
       <Stat
         label="Weekly trade count"
@@ -101,3 +105,4 @@ function Stat({
     </Card>
   );
 }
+

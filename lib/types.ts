@@ -292,6 +292,13 @@ export interface ChecklistItem {
   checked: boolean;
 }
 
+export interface SetupConfirmation {
+  market_structure_supports: boolean;
+  liquidity_met: boolean;
+  entry_zone_reached: boolean;
+  confirmation_candle: boolean;
+}
+
 export interface TimeframeAnalysis {
   trend?: string;
   structure?: string;
@@ -332,6 +339,14 @@ export interface DailyAnalysis {
   primary_direction: DirectionOption | null;
   confidence: ConfidenceOption | null;
   analysis_notes: string | null;
+  session: string | null;
+  market_condition: string | null;
+  setup_confirmation: SetupConfirmation | null;
+  daily_decision: "WAITING" | "CONFIRMED" | "NO_TRADE" | null;
+  computed_lot_size: number | null;
+  computed_risk_amount: number | null;
+  computed_rr: number | null;
+  computed_at: string | null;
   bias_tags: string[] | null;
   structure_tags: string[] | null;
   liquidity_tags: string[] | null;
@@ -497,7 +512,9 @@ export type AccountingFundKey =
   | "trading_income"
   | "other_income"
   | "business_expenses"
-  | "personal_expenses";
+  | "personal_expenses"
+  | "owner_capital"
+  | "account_purchase_expense";
 
 export type AccountingFundKind =
   | "asset"
@@ -526,7 +543,8 @@ export type AccountingTransactionKind =
   | "income"
   | "savings_deposit"
   | "refund"
-  | "correction";
+  | "correction"
+  | "owner_contribution";
 
 export interface AccountingTransaction {
   id: string;
@@ -622,12 +640,18 @@ export type AccountingPurchaseStatus =
 export interface AccountingPurchase {
   id: string;
   user_id: string;
+  linked_account_id: string | null;
   size: number;
   price: number;
   purchased_on: string | null;
   status: AccountingPurchaseStatus;
-  linked_account_id: string | null;
   notes: string | null;
+  prop_firm_name: string | null;
+  currency: string | null;
+  exchange_rate_to_usd: number | null;
+  reference: string | null;
+  payment_source: string | null;
+  transaction_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -905,3 +929,8 @@ export interface PlanHistoryEntry {
   diff: Record<string, unknown> | null;
   version_label: string | null;
 }
+
+
+
+
+

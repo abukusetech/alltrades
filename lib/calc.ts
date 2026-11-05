@@ -6,6 +6,7 @@
 
 import type { Trade, Withdrawal, Account } from "./types";
 import { startOfWeek, endOfWeek, toDateKey } from "./utils";
+import { computeConsistency, type ConsistencyResult } from "./consistency";
 
 // ---------- Types ----------
 
@@ -70,9 +71,10 @@ export interface AccountMetrics {
   tradingDays: number;
 
   // Consistency
-  consistencyScore: number; // 0-100, safe
-  requiredTotalProfit: number; // biggestWinningDay * 5
-  consistencyStatus: "safe" | "approaching" | "over";
+  consistencyScore: number | null; // 0-100, safe
+  /** Full Maven consistency result — source of truth for the UI. */
+  consistency: ConsistencyResult; // biggestWinningDay * 5
+  consistencyStatus: "passed" | "failed" | "na";
   maxConsistencyPercent: number;
 
   // Withdrawals
@@ -84,6 +86,7 @@ export interface AccountMetrics {
   withdrawalBlockReason:
     | "TARGET_NOT_REACHED"
     | "CONSISTENCY_ABOVE_LIMIT"
+    | "NO_PROFIT"
     | "NO_ACCOUNT"
     | null;
 
@@ -172,22 +175,17 @@ export function computeAccountMetrics(
     if (d.pnl < biggestLosingDay) biggestLosingDay = d.pnl;
   }
 
-  // Consistency: biggest winning day / total profit * 100
-  const totalProfit = dailyPnL.reduce((s, d) => s + Math.max(d.pnl, 0), 0);
-  let consistencyScore = 0;
-  if (totalProfit > 0 && biggestWinningDay > 0) {
-    const raw = (biggestWinningDay / totalProfit) * 100;
-    consistencyScore = Number.isFinite(raw) ? raw : 0;
-  }
-
-  const requiredTotalProfit =
-    biggestWinningDay > 0 ? biggestWinningDay * 5 : 0;
-
+  // Consistency — Maven Instant Funding official formula.
+  // See @/lib/consistency for the single source of truth.
   const maxConsistencyPercent = Number(account.max_consistency_percent) || 20;
-  let consistencyStatus: AccountMetrics["consistencyStatus"] = "safe";
-  if (consistencyScore > maxConsistencyPercent) consistencyStatus = "over";
-  else if (consistencyScore > maxConsistencyPercent * 0.8)
-    consistencyStatus = "approaching";
+  const consistency = computeConsistency({
+    trades,
+    maxAllowed: maxConsistencyPercent,
+  });
+  const consistencyScore = consistency.score;
+  const consistencyStatus: AccountMetrics["consistencyStatus"] =
+    consistency.status;
+  biggestWinningDay = consistency.biggestWinningDay;
 
   // Withdrawal target
   const withdrawalTargetPercent =
@@ -197,9 +195,10 @@ export function computeAccountMetrics(
   const amountRemaining = Math.max(withdrawalTarget - profitTowardTarget, 0);
   const targetReached = totalPnL >= withdrawalTarget;
 
-  const consistencyOk = consistencyScore <= maxConsistencyPercent;
+  const consistencyOk = consistency.status === "passed";
   let withdrawalBlockReason: AccountMetrics["withdrawalBlockReason"] = null;
   if (!targetReached) withdrawalBlockReason = "TARGET_NOT_REACHED";
+  else if (consistency.status === "na") withdrawalBlockReason = "NO_PROFIT";
   else if (!consistencyOk) withdrawalBlockReason = "CONSISTENCY_ABOVE_LIMIT";
 
   const withdrawalEligible = targetReached && consistencyOk;
@@ -225,7 +224,7 @@ export function computeAccountMetrics(
     totalWithdrawn,
 
     totalPnL,
-    totalProfit,
+    totalProfit: consistency.totalProfit,
     totalTrades,
     winningTrades,
     losingTrades,
@@ -241,7 +240,7 @@ export function computeAccountMetrics(
     tradingDays,
 
     consistencyScore,
-    requiredTotalProfit,
+    consistency,
     consistencyStatus,
     maxConsistencyPercent,
 
@@ -288,9 +287,9 @@ function emptyMetrics(account: Account | null): AccountMetrics {
     biggestLosingDay: 0,
     tradingDays: 0,
 
-    consistencyScore: 0,
-    requiredTotalProfit: 0,
-    consistencyStatus: "safe",
+    consistencyScore: null,
+    consistencyStatus: "na",
+    consistency: computeConsistency({ trades: [] }),
     maxConsistencyPercent: Number(account?.max_consistency_percent) || 20,
 
     withdrawalTarget: startCap * (withdrawalTargetPercent / 100),
@@ -472,7 +471,7 @@ export interface WeeklyAggregate {
   averagePnL: number | null;
   biggestWinningDay: number;
   biggestLosingDay: number;
-  consistencyScore: number;
+  consistencyScore: number | null;
   strategiesUsed: string[];
   instrumentsTraded: string[];
   mistakes: string[];
@@ -507,15 +506,8 @@ export function aggregateWeek(
     if (d.pnl < biggestLosingDay) biggestLosingDay = d.pnl;
   }
 
-  const totalProfit = Array.from(dailyMap.values()).reduce(
-    (s, d) => s + Math.max(d.pnl, 0),
-    0
-  );
-  let consistencyScore = 0;
-  if (totalProfit > 0 && biggestWinningDay > 0) {
-    const raw = (biggestWinningDay / totalProfit) * 100;
-    consistencyScore = Number.isFinite(raw) ? raw : 0;
-  }
+  const consistency = computeConsistency({ trades: inWeek });
+  const consistencyScore = consistency.score;
 
   const strategiesUsed = Array.from(
     new Set(inWeek.map((t) => t.strategy).filter(Boolean) as string[])
@@ -575,3 +567,18 @@ export function computeAnalysisStats(
   const accuracy = resolved > 0 ? (correct / resolved) * 100 : null;
   return { total, pending, correct, partial, incorrect, resolved, accuracy };
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
