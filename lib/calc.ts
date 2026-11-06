@@ -103,6 +103,13 @@ export interface AccountMetrics {
 
 // ---------- Core calculations ----------
 
+export function getNetPnL(t: Trade): number {
+  const gross = Number(t.profit_loss) || 0;
+  const comm = Number(t.commission) || 0;
+  const swap = Number(t.swap) || 0;
+  return gross + comm + swap;
+}
+
 export function buildDailyMap(trades: Trade[]): Map<string, DailyPnL> {
   const map = new Map<string, DailyPnL>();
   for (const t of trades) {
@@ -582,3 +589,46 @@ export function computeAnalysisStats(
 
 
 
+
+
+// ============================================================
+// Global Instrument Audit Helpers
+// ============================================================
+
+export interface InstrumentStats {
+  instrument: string;
+  trades: number;
+  pnl: number;
+  winRate: number | null;
+  wins: number;
+  losses: number;
+}
+
+export function breakDownByInstrument(trades: Trade[]): InstrumentStats[] {
+  const groups = new Map<string, Trade[]>();
+  
+  for (const t of trades) {
+    const key = t.instrument || "Unknown";
+    const arr = groups.get(key) ?? [];
+    arr.push(t);
+    groups.set(key, arr);
+  }
+
+  return Array.from(groups.entries())
+    .map(([instrument, list]) => {
+      const wins = list.filter((t) => t.result === "Win").length;
+      const losses = list.filter((t) => t.result === "Loss").length;
+      const total = list.length;
+      const pnl = list.reduce((sum, t) => sum + getNetPnL(t), 0);
+      
+      return {
+        instrument,
+        trades: total,
+        pnl,
+        winRate: total > 0 ? (wins / total) * 100 : null,
+        wins,
+        losses,
+      };
+    })
+    .sort((a, b) => b.pnl - a.pnl); // Sort by highest profit
+}

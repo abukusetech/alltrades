@@ -10,6 +10,7 @@ import { computeAccountMetrics } from "@/lib/calc";
 import { computePosition } from "@/lib/position-math";
 import { computeGate, type GateStatus, type GateCheck } from "@/lib/trade-check-gate";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { WeeklyLockBanner } from "@/components/dashboard/WeeklyLockBanner";
 import { AccountHeader } from "@/components/layout/AccountHeader";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -92,6 +93,7 @@ export function TradeCheckClient() {
       />
 
       <AccountHeader account={currentAccount} currentCapital={metrics.currentCapital} />
+      <WeeklyLockBanner />
 
       {isLoading ? (
         <div className="py-12 text-center text-2xs text-ink-500">Loading today's analysis…</div>
@@ -199,4 +201,5 @@ function CheckRow({ check }: { check: GateCheck }) {
     </div>
   );
 }
+
 

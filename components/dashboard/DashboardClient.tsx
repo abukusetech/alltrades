@@ -9,6 +9,8 @@ import {
   useWithdrawalsForFilter,
 } from "@/lib/data/hooks";
 import { computeAccountMetrics, computeDrawdownStatus } from "@/lib/calc";
+import { getWeeklyLockStatus, type WeeklyLockStatus } from "@/lib/data/weekly-lock";
+import { createClient } from "@/lib/supabase/client";
 import { groupMetricsByType } from "@/lib/accounts/metrics";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { AccountHeader } from "@/components/layout/AccountHeader";
@@ -20,9 +22,12 @@ import { WeeklyDisciplineCard } from "@/components/dashboard/WeeklyDisciplineCar
 import { ConsistencySummaryCard } from "@/components/dashboard/ConsistencySummaryCard";
 import { PersonalRiskSummaryCard } from "@/components/dashboard/PersonalRiskSummaryCard";
 import { RecentTradesCard } from "@/components/dashboard/RecentTradesCard";
+import dynamic from "next/dynamic";
+const WorldClocks = dynamic(() => import("@/components/dashboard/WorldClocks").then(m => m.WorldClocks), { ssr: false });
 import { AccountRiskCard } from "@/components/dashboard/AccountRiskCard";
 import { DailyTargetRiskCard } from "@/components/dashboard/DailyTargetRiskCard";
 import { TypeAwareMetrics } from "@/components/dashboard/TypeAwareMetrics";
+import { WeeklyLockBanner } from "@/components/dashboard/WeeklyLockBanner";
 
 export function DashboardClient() {
   const { currentAccount, filteredAccounts, filterMode } = useCurrentAccount();
@@ -33,6 +38,22 @@ export function DashboardClient() {
     useWithdrawalsForFilter(filteredAccounts);
 
   const loading = tradesLoading || withdrawalsLoading;
+
+  const supabase = React.useMemo(() => createClient(), []);
+  const [weeklyStatus, setWeeklyStatus] = React.useState<WeeklyLockStatus | null>(null);
+
+  React.useEffect(() => {
+    async function loadStatus() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      try {
+        setWeeklyStatus(await getWeeklyLockStatus(supabase, user.id));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    void loadStatus();
+  }, [supabase]);
 
   // Pick the primary account for the rich cards.
   const primaryAccount = React.useMemo(() => {
@@ -121,6 +142,7 @@ export function DashboardClient() {
           )}
 
           <TypeAwareMetrics mode={filterMode} grouped={grouped} />
+          <WeeklyLockBanner />
 
           {!isAll && primaryAccount && (
             <>
@@ -143,7 +165,7 @@ export function DashboardClient() {
                 </div>
 
                 <div className="space-y-4">
-                  <WeeklyDisciplineCard metrics={metrics} />
+                  <WeeklyDisciplineCard metrics={metrics} weeklyLossCount={weeklyStatus?.lossCount} isLocked={weeklyStatus?.isLocked} />
 
                   {/* Right-column card — swap by type */}
                   {isMaven && <ConsistencySummaryCard metrics={metrics} />}
@@ -163,10 +185,19 @@ export function DashboardClient() {
                   maxTotalPercent={
                     Number(primaryAccount.max_total_drawdown_percent) || 3
                   }
+                  currentEquity={metrics.currentCapital}
+                  consistencyScore={metrics.consistency?.score ?? null}
+                  mostProfitableDay={metrics.biggestWinningDay}
+                  totalProfits={metrics.totalPnL}
+                  accountId={primaryAccount.id}
                 />
               )}
             </>
           )}
+
+
+          {/* World Clocks — Wave 1 */}
+          <WorldClocks />
 
           {isAll && (
             <div className="grid gap-4 lg:grid-cols-3">
@@ -180,4 +211,14 @@ export function DashboardClient() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
 

@@ -54,6 +54,16 @@ export function CalendarClient() {
     [metrics, selectedDate]
   );
 
+  // Compute a map of date -> unique instruments traded
+  const dayInstrumentsMap = React.useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const t of trades) {
+      if (!map.has(t.trade_date)) map.set(t.trade_date, new Set());
+      map.get(t.trade_date)?.add(t.instrument);
+    }
+    return map;
+  }, [trades]);
+
   // ---- Build a Sunday-first 6×7 grid (42 cells) ----
   const grid: GridCell[] = React.useMemo(() => {
     const first = startOfMonth(cursor);
@@ -278,13 +288,22 @@ export function CalendarClient() {
                             )}
                           </div>
                           {hasTrades ? (
-                            <div
-                              className={cn(
-                                "tabular text-xs font-semibold",
-                                pnlText
-                              )}
-                            >
-                              {formatCurrency(dayPnl, { showSign: true })}
+                            <div className="w-full">
+                              <div
+                                className={cn(
+                                  "tabular text-xs font-semibold",
+                                  pnlText
+                                )}
+                              >
+                                {formatCurrency(dayPnl, { showSign: true })}
+                              </div>
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {Array.from(dayInstrumentsMap.get(c.key) ?? []).map((inst) => (
+                                  <span key={inst} className="rounded bg-white/50 px-1 py-0.5 text-[9px] font-medium text-ink-600 dark:bg-ink-800/50 dark:text-ink-300">
+                                    {inst === "XAUUSD / Gold" ? "XAU" : inst}
+                                  </span>
+                                ))}
+                              </div>
                             </div>
                           ) : (
                             <span className="text-3xs text-ink-300">—</span>
@@ -349,3 +368,4 @@ function LegendDot({ className, label }: { className: string; label: string }) {
     </span>
   );
 }
+

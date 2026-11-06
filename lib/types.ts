@@ -67,6 +67,7 @@ export interface Account {
   daily_reference_balance: number | null;
   daily_reference_set_at: string | null;
   highest_equity_watermark: number | null;
+  watermark_override: number | null;
   current_balance: number | null;
   kyc_status: 'Not started' | 'Required' | 'In progress' | 'Verified' | 'Action required';
 }
@@ -933,4 +934,100 @@ export interface PlanHistoryEntry {
 
 
 
+
+
+
+// ============================================================
+// Planning page types
+// ============================================================
+
+
+
+export interface Plan {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  target_amount: number | null;
+  start_date: string;
+  deadline: string | null;
+  category: PlanCategory;
+  status: PlanStatus;
+  progress_percent: number;
+  notes: string | null;
+  archived: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+
+
+// ============================================================
+// Market Sentiment (Phase 3)
+// ============================================================
+
+export interface CotPositioning {
+  reportDate: string; // YYYY-MM-DD
+  longPositions: number;
+  shortPositions: number;
+  netPositions: number;
+  changeFromPrevious: number | null;
+}
+
+export interface GoldFearGreed {
+  value: number; // 0-100
+  classification: string; // "Extreme Fear", "Fear", "Neutral", "Greed", "Extreme Greed"
+  timestamp: string; // ISO date
+}
+
+// ============================================================
+// Planning System (Full)
+// ============================================================
+
+export type PlanCategory = "Trading" | "Funded Accounts" | "Financial" | "Business" | "Personal Development" | "Other";
+export type PlanPriority = "High" | "Medium" | "Low";
+export type PlanStatus = "not_started" | "in_progress" | "achieved" | "failed" | "paused";
+
+export interface Plan {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  category: PlanCategory;
+  priority: PlanPriority;
+  starting_value: number | null;
+  current_value: number | null;
+  target_value: number | null;
+  start_date: string;
+  deadline: string | null;
+  status: PlanStatus;
+  status_explanation: string | null;
+  notes: string | null;
+  manual_progress: number | null;
+  archived: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlanMilestone {
+  id: string;
+  plan_id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  due_date: string | null;
+  completed: boolean;
+  completed_at: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface PlanHistoryEntry {
+  id: string;
+  plan_id: string;
+  user_id: string;
+  action: string;
+  details: Record<string, unknown> | null;
+  created_at: string;
+}
 

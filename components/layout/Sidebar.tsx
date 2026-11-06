@@ -11,6 +11,7 @@ import {
   ClipboardCheck,
   ShieldCheck,
   ArrowUpRight,
+  Target,
   Settings,
   LogOut,
   X,
@@ -20,6 +21,7 @@ import {
   ScrollText,
   Sunrise,
   Wallet,
+  Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +34,7 @@ interface NavItem {
 const WORKSPACE: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/daily-analysis", label: "Daily Analysis", icon: Sunrise },
+  { href: "/market-intelligence", label: "Market Intelligence", icon: Activity },
   { href: "/trade-check", label: "Trade Check", icon: ClipboardList },
   { href: "/position-calculator", label: "Position Calculator", icon: Calculator },
   { href: "/journal", label: "Journal", icon: BookOpen },
@@ -39,6 +42,7 @@ const WORKSPACE: NavItem[] = [
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/analytics", label: "Analytics", icon: ChartNoAxesCombined },
   { href: "/weekly-review", label: "Weekly Review", icon: ClipboardCheck },
+  { href: "/planning", label: "Planning", icon: Target },
 ];
 
 const ACCOUNT: NavItem[] = [
@@ -213,4 +217,6 @@ export function AlltradesMark({ className }: { className?: string }) {
     </svg>
   );
 }
+
+
 

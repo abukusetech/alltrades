@@ -1,4 +1,6 @@
 ﻿import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
+import { breakDownByInstrument } from "@/lib/calc";
+import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
 import type { WeeklyAggregate } from "@/lib/calc";
 import { cn } from "@/lib/utils";
@@ -8,8 +10,37 @@ export interface WeekSummaryListsProps {
 }
 
 export function WeekSummaryLists({ week }: WeekSummaryListsProps) {
+  const byInstrument = breakDownByInstrument(week.trades);
+  const bestInstrument = byInstrument.length > 0 ? byInstrument[0] : null;
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
+      {/* Instrument Performance */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Instrument Performance</CardTitle>
+          <Badge tone="neutral">{byInstrument.length}</Badge>
+        </CardHeader>
+        <CardBody>
+          {byInstrument.length === 0 ? (
+            <Empty text="No instruments traded this week." />
+          ) : (
+            <ul className="space-y-3">
+              {byInstrument.map((inst) => (
+                <li key={inst.instrument} className="flex items-center justify-between border-b border-border pb-2 last:border-0 last:pb-0">
+                  <div>
+                    <div className="text-xs font-medium text-ink-900">{inst.instrument}</div>
+                    <div className="text-3xs text-ink-500">{inst.trades} trades · {inst.winRate?.toFixed(0)}% win rate</div>
+                  </div>
+                  <div className={cn("tabular text-xs font-bold", inst.pnl >= 0 ? "text-profit-text" : "text-loss-text")}>
+                    {formatCurrency(inst.pnl, { showSign: true })}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle>Strategies used</CardTitle>
@@ -114,3 +145,4 @@ export function WeekSummaryLists({ week }: WeekSummaryListsProps) {
 function Empty({ text }: { text: string }) {
   return <p className="text-2xs text-ink-500">{text}</p>;
 }
+

@@ -1,4 +1,6 @@
-﻿import { Check, Clock } from "lucide-react";
+﻿"use client";
+
+import { Check, Clock, Lock, ShieldAlert } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import type { AccountMetrics } from "@/lib/calc";
@@ -7,13 +9,21 @@ import { endOfWeek, formatWeekRange, startOfWeek } from "@/lib/utils";
 export interface WeeklyDisciplineCardProps {
   metrics: AccountMetrics;
   referenceDate?: Date;
+  weeklyLossCount?: number;
+  isLocked?: boolean;
 }
 
 export function WeeklyDisciplineCard({
   metrics,
   referenceDate = new Date(),
+  weeklyLossCount = 0,
+  isLocked = false,
 }: WeeklyDisciplineCardProps) {
-  const { weeklyTradeCount, maxWeeklyTrades, weeklyLimitReached } = metrics;
+  const { weeklyTradeCount } = metrics;
+  
+  // HARDCODED TO 5 TRADES PER WEEK AS REQUESTED
+  const maxWeeklyTrades = 5; 
+  
   const weekStart = startOfWeek(referenceDate);
   const weekEnd = endOfWeek(referenceDate);
 
@@ -28,14 +38,28 @@ export function WeeklyDisciplineCard({
             {formatWeekRange(weekStart, weekEnd)}
           </p>
         </div>
-        <Badge tone={weeklyLimitReached ? "warn" : "neutral"}>
-          {weeklyTradeCount} / {maxWeeklyTrades}
+        <Badge tone={isLocked ? "loss" : weeklyTradeCount >= maxWeeklyTrades ? "warn" : "neutral"}>
+          {weeklyTradeCount} / {maxWeeklyTrades} Trades
         </Badge>
       </CardHeader>
 
-      <CardBody className="space-y-3">
+      <CardBody className="space-y-4">
+        
+        {/* LOSS LOCK STATUS */}
+        <div className={`flex items-center justify-between rounded-lg border px-3 py-2 ${isLocked ? 'border-loss-border bg-loss-bg text-loss-text' : weeklyLossCount > 0 ? 'border-warn-border bg-warn-bg text-warn-text' : 'border-profit-border bg-profit-bg text-profit-text'}`}>
+          <div className="flex items-center gap-2">
+            {isLocked ? <Lock className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
+            <span className="text-2xs font-semibold uppercase tracking-wide">
+              {isLocked ? "Trading Locked" : "Loss Allowance"}
+            </span>
+          </div>
+          <span className="tabular text-xs font-bold">
+            {weeklyLossCount} / 2 Losses
+          </span>
+        </div>
+
         <div className="text-2xs text-ink-600">
-          Trades this week
+          Weekly Trades
         </div>
 
         <ul className="space-y-1.5">
@@ -68,9 +92,14 @@ export function WeeklyDisciplineCard({
           })}
         </ul>
 
-        {weeklyLimitReached && (
+        {weeklyTradeCount >= maxWeeklyTrades && (
           <p className="text-2xs text-warn-text">
-            Weekly trade limit reached. New trades are blocked until next week.
+            Weekly trade limit reached. No more trades can be recorded.
+          </p>
+        )}
+        {isLocked && (
+          <p className="text-2xs text-loss-text">
+            Two losses reached. Trading is suspended until next week.
           </p>
         )}
       </CardBody>

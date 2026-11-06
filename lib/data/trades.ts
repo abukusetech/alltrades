@@ -1,5 +1,6 @@
 ﻿import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Trade, RuleCheck } from "@/lib/types";
+import { getWeeklyLockStatus } from "./weekly-lock";
 
 export interface TradeFilters {
   accountId: string;
@@ -130,6 +131,14 @@ export async function createTrade(
   userId: string,
   values: TradeInsert
 ): Promise<Trade> {
+  // ENFORCE WEEKLY LOCK
+  const lockStatus = await getWeeklyLockStatus(supabase, userId);
+  if (lockStatus.isLocked) {
+    throw new Error(
+      "WEEKLY TRADING LOCKED: You have reached 2 losses this week. Trading is suspended until next Monday."
+    );
+  }
+
   const { data, error } = await supabase
     .from("trades")
     .insert({ ...values, user_id: userId })
@@ -161,3 +170,4 @@ export async function deleteTrade(
   const { error } = await supabase.from("trades").delete().eq("id", id);
   if (error) throw error;
 }
+

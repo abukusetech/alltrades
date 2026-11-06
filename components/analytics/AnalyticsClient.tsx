@@ -4,7 +4,7 @@ import * as React from "react";
 import { ChartNoAxesCombined } from "lucide-react";
 import { useCurrentAccount } from "@/components/layout/AppShell";
 import { useTrades, useWithdrawals } from "@/lib/data/hooks";
-import { breakdownBy, computeAccountMetrics } from "@/lib/calc";
+import { breakdownBy, computeAccountMetrics, breakDownByInstrument } from "@/lib/calc";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { AccountHeader } from "@/components/layout/AccountHeader";
 import { BlockLoader } from "@/components/ui/Spinner";
@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { AnalyticsStatsCards } from "./AnalyticsStatsCards";
 import { EquityBars } from "./EquityBars";
 import { BreakdownTable } from "./BreakdownTable";
+import { InstrumentBreakdown } from "./InstrumentBreakdown";
 import dynamic from "next/dynamic";
 
 // Recharts is heavy — lazy load it. Donut renders after first paint.
@@ -37,10 +38,11 @@ export function AnalyticsClient() {
     [currentAccount, trades, withdrawals]
   );
 
-  const byInstrument = React.useMemo(() => breakdownBy(trades, "instrument"), [trades]);
+
   const byStrategy = React.useMemo(() => breakdownBy(trades, "strategy"), [trades]);
   const bySession = React.useMemo(() => breakdownBy(trades, "session"), [trades]);
   const bySetup = React.useMemo(() => breakdownBy(trades, "setup_type"), [trades]);
+  const byInstrumentStats = React.useMemo(() => breakDownByInstrument(trades), [trades]);
 
   return (
     <div className="space-y-6">
@@ -67,16 +69,17 @@ export function AnalyticsClient() {
               <ResultsDonut metrics={metrics} />
             </div>
           </div>
+          <InstrumentBreakdown stats={byInstrumentStats} />
+          
           <div className="grid gap-4 lg:grid-cols-2">
-            <BreakdownTable title="By Instrument" rows={byInstrument} emptyLabel="No instrument data yet." />
             <BreakdownTable title="By Strategy" rows={byStrategy} emptyLabel="No strategy data yet." />
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
             <BreakdownTable title="By Session" rows={bySession} emptyLabel="No session data yet." />
-            <BreakdownTable title="By Setup Type" rows={bySetup} emptyLabel="No setup data yet." />
           </div>
+          <BreakdownTable title="By Setup Type" rows={bySetup} emptyLabel="No setup data yet." />
         </>
       )}
     </div>
   );
 }
+
+
