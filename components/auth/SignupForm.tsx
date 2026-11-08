@@ -98,6 +98,7 @@ export function SignupForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
+            showPasswordToggle
           />
         </Field>
 
@@ -109,6 +110,7 @@ export function SignupForm() {
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             placeholder="••••••••"
+            showPasswordToggle
           />
         </Field>
 
@@ -135,3 +137,4 @@ export function SignupForm() {
     </form>
   );
 }
+

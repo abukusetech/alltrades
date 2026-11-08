@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { classifyVolatility, type Candle, type VolatilityResult } from "@/lib/volatility";
+import { getGlobalMarketStatus } from "@/lib/market-engine";
 
 export interface VolatilityData {
   symbol: string;
@@ -33,18 +34,11 @@ export function useVolatility(symbol: "EURUSD" | "XAUUSD", interval = "15min"): 
 
     async function fetchData() {
       try {
-        // 1. Check if the market is closed (Weekend Check in NY time)
+        // 1. Use the Central Market Engine
         const now = new Date();
-        const nyDate = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
-        const dayOfWeek = nyDate.getDay(); // 0 = Sunday, 5 = Friday, 6 = Saturday
-        const nyHours = nyDate.getHours();
+        const market = getGlobalMarketStatus(now);
         
-        const isWeekend = 
-          (dayOfWeek === 6) || 
-          (dayOfWeek === 0 && nyHours < 17) || 
-          (dayOfWeek === 5 && nyHours >= 17);
-
-        if (isWeekend) {
+        if (!market.isOpen) {
           if (mounted) {
             setData({
               symbol,
@@ -125,3 +119,4 @@ export function useVolatility(symbol: "EURUSD" | "XAUUSD", interval = "15min"): 
 
   return data;
 }
+

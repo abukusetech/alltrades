@@ -13,27 +13,26 @@ const supabase = createClient();
 
 export function useDailyAnalysis(
   accountId: string | null,
-  date: string
+  date: string,
+  instrument: string = "EURUSD"
 ) {
-  const key = accountId ? (["dailyAnalysis", accountId, date] as const) : null;
+  const key = accountId
+    ? (["dailyAnalysis", accountId, date, instrument] as const)
+    : null;
   return useSWR<DailyAnalysis | null>(
     key,
-    ([, accId, d]) => getDailyAnalysis(supabase, accId as string, d as string),
+    ([, accId, d, inst]) =>
+      getDailyAnalysis(supabase, accId as string, d as string, inst as string),
     {
-      // CRITICAL: revalidate on every mount so returning to the page always
-      // fetches the latest saved data. Without this, SWR serves the stale
-      // null that was cached the first time the key was opened (before any
-      // save existed), producing the "empty on return" bug.
       revalidateOnMount: true,
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
       revalidateIfStale: true,
-      // Keep the previous data visible while the new fetch is in flight so
-      // the form doesn't flash empty during revalidation.
-      keepPreviousData: true,
-      // Deduplicate within 2s only — not 5 min.
+      // CRITICAL: Do NOT keep previous data when switching instruments.
+      // We want the UI to clear instantly so the user knows they
+      // are looking at a new record.
+      keepPreviousData: false, 
       dedupingInterval: 2000,
-      // Never treat a null fetch as authoritative for more than a moment.
       errorRetryCount: 2,
       errorRetryInterval: 2000,
     }
@@ -41,6 +40,9 @@ export function useDailyAnalysis(
 }
 
 export function useDailyAnalysesHistory(accountId: string | null, limit = 60) {
+  // We intentionally do NOT include the instrument in the key or the fetch.
+  // The history list should show every saved analysis for this account,
+  // regardless of which instrument is currently selected in the UI.
   const key = accountId
     ? (["dailyAnalysesHistory", accountId, limit] as const)
     : null;
@@ -145,3 +147,6 @@ export function useAutosave<T>(
 
   return { state, error, forceSave };
 }
+
+
+

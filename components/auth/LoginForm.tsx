@@ -73,6 +73,7 @@ export function LoginForm() {
             onChange={(e) => setPassword(e.target.value)}
             invalid={!!error && !password}
             placeholder="••••••••"
+            showPasswordToggle
           />
         </Field>
 
@@ -104,3 +105,4 @@ export function LoginForm() {
     </form>
   );
 }
+

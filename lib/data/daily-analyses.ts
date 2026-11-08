@@ -4,13 +4,15 @@ import type { DailyAnalysis } from "@/lib/types";
 export async function getDailyAnalysis(
   supabase: SupabaseClient,
   accountId: string,
-  date: string
+  date: string,
+  instrument: string = "EURUSD"
 ): Promise<DailyAnalysis | null> {
   const { data, error } = await supabase
     .from("daily_analyses")
     .select("*")
     .eq("account_id", accountId)
     .eq("analysis_date", date)
+    .eq("instrument", instrument)
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -68,6 +70,27 @@ export type DailyAnalysisInsert = Omit<
   | "computed_risk_amount"
   | "computed_rr"
   | "computed_at"
+  | "d1_analysis"
+  | "h4_analysis"
+  | "h1_analysis"
+  | "m30_analysis"
+  | "m15_analysis"
+  | "m5_analysis"
+  | "m1_analysis"
+  | "dealing_range"
+  | "liquidity_narrative"
+  | "confirmation_states"
+  | "completion_percent"
+  | "setup_quality_percent"
+  | "confirmation_percent"
+  | "final_decision"
+  | "is_frozen"
+  | "frozen_at"
+  | "setup_model"
+  | "planned_tp1"
+  | "planned_tp2"
+  | "planned_final_target"
+  | "planned_expected_reward"
 > & {
   bias_tags?: string[] | null;
   structure_tags?: string[] | null;
@@ -85,6 +108,27 @@ export type DailyAnalysisInsert = Omit<
   computed_risk_amount?: number | null;
   computed_rr?: number | null;
   computed_at?: string | null;
+  d1_analysis?: import("@/lib/types").TimeframeAnalysisJson | null;
+  h4_analysis?: import("@/lib/types").TimeframeAnalysisJson | null;
+  h1_analysis?: import("@/lib/types").TimeframeAnalysisJson | null;
+  m30_analysis?: import("@/lib/types").TimeframeAnalysisJson | null;
+  m15_analysis?: import("@/lib/types").TimeframeAnalysisJson | null;
+  m5_analysis?: import("@/lib/types").TimeframeAnalysisJson | null;
+  m1_analysis?: import("@/lib/types").TimeframeAnalysisJson | null;
+  dealing_range?: import("@/lib/types").DealingRange | null;
+  liquidity_narrative?: import("@/lib/types").LiquidityNarrative | null;
+  confirmation_states?: import("@/lib/types").ConfirmationStates | null;
+  completion_percent?: number | null;
+  setup_quality_percent?: number | null;
+  confirmation_percent?: number | null;
+  final_decision?: import("@/lib/types").FinalDecision | null;
+  is_frozen?: boolean | null;
+  frozen_at?: string | null;
+  setup_model?: string | null;
+  planned_tp1?: number | null;
+  planned_tp2?: number | null;
+  planned_final_target?: number | null;
+  planned_expected_reward?: number | null;
 };
 
 export type DailyAnalysisUpdate = Partial<DailyAnalysisInsert>;
@@ -138,21 +182,26 @@ export async function upsertDailyAnalysis(
   values: DailyAnalysisInsert
 ): Promise<DailyAnalysis> {
   const payload = { ...values, user_id: userId };
+  const instrument = values.instrument || "EURUSD";
 
-  // 1. Try to find an existing row for this account + date
+  // 1. Look for an EXISTING row for the SAME account + date + instrument.
+  //    If a EURUSD row exists for today but we are saving XAUUSD, this
+  //    query correctly returns null, so we insert a NEW row instead of
+  //    overwriting the EURUSD one.
   const { data: existing, error: findErr } = await supabase
     .from("daily_analyses")
     .select("id")
     .eq("user_id", userId)
     .eq("account_id", values.account_id)
     .eq("analysis_date", values.analysis_date)
+    .eq("instrument", instrument)
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (findErr) throw findErr;
 
-  // 2. UPDATE path
+  // 2. UPDATE path — the exact same row exists
   if (existing?.id) {
     const { data, error } = await supabase
       .from("daily_analyses")
@@ -164,7 +213,7 @@ export async function upsertDailyAnalysis(
     return data as DailyAnalysis;
   }
 
-  // 3. INSERT path
+  // 3. INSERT path — no row for this (account, date, instrument) combination yet
   const { data, error } = await supabase
     .from("daily_analyses")
     .insert(payload)
@@ -172,7 +221,7 @@ export async function upsertDailyAnalysis(
     .single();
 
   if (error) {
-    // Race: another insert won. Fall back to UPDATE on the winner.
+    // Race condition — another tab inserted a row for the same key first
     const code = (error as { code?: string }).code;
     if (code === "23505") {
       const { data: winner, error: wErr } = await supabase
@@ -181,6 +230,7 @@ export async function upsertDailyAnalysis(
         .eq("user_id", userId)
         .eq("account_id", values.account_id)
         .eq("analysis_date", values.analysis_date)
+        .eq("instrument", instrument)
         .limit(1)
         .maybeSingle();
       if (wErr) throw wErr;
@@ -200,7 +250,6 @@ export async function upsertDailyAnalysis(
 
   return data as DailyAnalysis;
 }
-
 export async function deleteDailyAnalysis(
   supabase: SupabaseClient,
   id: string
@@ -211,4 +260,10 @@ export async function deleteDailyAnalysis(
     .eq("id", id);
   if (error) throw error;
 }
+
+
+
+
+
+
 

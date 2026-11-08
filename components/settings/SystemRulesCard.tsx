@@ -21,7 +21,7 @@ export function SystemRulesCard({ account }: SystemRulesCardProps) {
           <Row label="Calendar" value={String(year)} />
           <Row
             label="Maximum trades"
-            value={account ? `${account.max_weekly_trades} / week` : "3 / week"}
+            value={account ? `${account.max_weekly_trades ?? 5} / week` : "5 / week"}
           />
           <Row
             label="Withdrawal target"

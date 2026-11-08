@@ -328,7 +328,108 @@ export interface EndOfDayReview {
   whatLearned?: string;
 }
 
+// ============================================================
+// Timeframe Analysis JSON structure (per-timeframe)
+// ============================================================
+
+export interface TimeframeAnalysisJson {
+  bias?: string | null;             // Bullish / Bearish / Neutral / Range / Unanalyzed
+  structure?: string | null;        // BOS / CHoCH / MSS / HH-HL / LH-LL / Range
+  rangeHigh?: number | null;
+  rangeLow?: number | null;
+  swingHigh?: number | null;
+  swingLow?: number | null;
+  supplyZones?: string | null;
+  demandZones?: string | null;
+  orderBlocks?: string | null;
+  fvgs?: string | null;
+  breakers?: string | null;
+  mitigationBlocks?: string | null;
+  buySideLiquidity?: string | null;
+  sellSideLiquidity?: string | null;
+  pdLocation?: string | null;       // Premium / Discount / Equilibrium
+  drawOnLiquidity?: string | null;
+  direction?: string | null;
+  entryPOI?: string | null;
+  entryTrigger?: string | null;
+  confirmation?: string | null;
+  invalidation?: string | null;
+  notes?: string | null;
+}
+
+// ============================================================
+// Dealing Range (Premium / Discount)
+// ============================================================
+
+export interface DealingRange {
+  timeframe?: string | null;
+  rangeHigh?: number | null;
+  rangeLow?: number | null;
+  equilibrium?: number | null;      // Auto-computed from high/low
+  currentPrice?: number | null;     // Manual entry
+  location?: "Premium" | "Discount" | "Equilibrium" | null;
+  notes?: string | null;
+}
+
+// ============================================================
+// Liquidity Narrative (structured selects)
+// ============================================================
+
+export interface LiquidityNarrative {
+  external?: "Buy-side" | "Sell-side" | "Both" | "Neither" | null;
+  internal?: string | null;
+  expectedEvent?:
+    | "Sweep Buy-side"
+    | "Sweep Sell-side"
+    | "Internal sweep"
+    | "External sweep"
+    | "No sweep"
+    | "Already swept"
+    | null;
+  expectedDraw?: string | null;
+  narrative?: string | null;        // "What is price seeking and why?"
+}
+
+// ============================================================
+// Confirmation states (3-state per item)
+// ============================================================
+
+export type ConfirmationState = "YES" | "NO" | "NA";
+
+export interface ConfirmationStates {
+  [key: string]: ConfirmationState | undefined;
+}
+
+// ============================================================
+// Final decision
+// ============================================================
+
+export type FinalDecision = "INCOMPLETE" | "WAITING" | "READY" | "NO_TRADE" | "INVALIDATED";
+
+// ============================================================
+// Zone (matches daily_analysis_zones table)
+// ============================================================
+
+export interface DailyAnalysisZone {
+  id: string;
+  analysis_id: string;
+  user_id: string;
+  name: string;
+  timeframe: "D1" | "H4" | "H1" | "M30" | "M15" | "M5" | "M1" | "CUSTOM";
+  zone_type: string;
+  price: number | null;
+  price_high: number | null;
+  price_low: number | null;
+  direction: "bullish" | "bearish" | "neutral" | null;
+  importance: "high" | "medium" | "low" | null;
+  notes: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DailyAnalysis {
+
   id: string;
   user_id: string;
   account_id: string;
@@ -356,6 +457,24 @@ export interface DailyAnalysis {
   news_tags: string[] | null;
   readiness_percent: number | null;
   active_plan_id: string | null;
+
+  // ---- Phase B additions (per-instrument analysis redesign) ----
+  d1_analysis: TimeframeAnalysisJson | null;
+  h4_analysis: TimeframeAnalysisJson | null;
+  h1_analysis: TimeframeAnalysisJson | null;
+  m30_analysis: TimeframeAnalysisJson | null;
+  m15_analysis: TimeframeAnalysisJson | null;
+  m5_analysis: TimeframeAnalysisJson | null;
+  m1_analysis: TimeframeAnalysisJson | null;
+  dealing_range: DealingRange | null;
+  liquidity_narrative: LiquidityNarrative | null;
+  confirmation_states: ConfirmationStates | null;
+  completion_percent: number | null;
+  setup_quality_percent: number | null;
+  confirmation_percent: number | null;
+  final_decision: FinalDecision | null;
+  is_frozen: boolean | null;
+  frozen_at: string | null;
 
   tf_4h: TimeframeAnalysis | null;
   tf_1h: TimeframeAnalysis | null;
@@ -1030,4 +1149,7 @@ export interface PlanHistoryEntry {
   details: Record<string, unknown> | null;
   created_at: string;
 }
+
+
+
 
