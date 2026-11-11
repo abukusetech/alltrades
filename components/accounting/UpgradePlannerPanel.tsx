@@ -38,8 +38,8 @@ export function UpgradePlannerPanel({
   minimumReserve: number;
 }) {
   const [scenario, setScenario] = React.useState<Scenario>("moderate");
-  const [payoutAmount, setPayoutAmount] = React.useState("64");
-  const [payoutsPerMonth, setPayoutsPerMonth] = React.useState("1");
+  const [payoutAmount, setPayoutAmount] = React.useState("0");
+  const [payoutsPerMonth, setPayoutsPerMonth] = React.useState("0");
   const [allocationPct, setAllocationPct] = React.useState(
     String(settings?.account_fund_percent ?? 50)
   );
@@ -61,6 +61,20 @@ export function UpgradePlannerPanel({
     );
   }, [withdrawals]);
 
+  // Populate the estimate from real payout history when available.
+  // Keep zero when there is no history rather than inventing a forecast.
+  React.useEffect(() => {
+    if (avgNetPayout !== null && payoutAmount === "0") {
+      setPayoutAmount(avgNetPayout.toFixed(2));
+    }
+  }, [avgNetPayout, payoutAmount]);
+
+  React.useEffect(() => {
+    if (settings?.account_fund_percent != null) {
+      setAllocationPct(String(settings.account_fund_percent));
+    }
+  }, [settings?.account_fund_percent]);
+
   const effectivePayout = React.useMemo(() => {
     const base = Number(payoutAmount) || 0;
     return base * SCENARIO_CONFIG[scenario].multiplier;
@@ -78,7 +92,7 @@ export function UpgradePlannerPanel({
 
   const monthsNeeded = React.useMemo(() => {
     const perMonth = Number(payoutsPerMonth) || 0;
-    if (!payoutsNeeded || perMonth <= 0) return null;
+    if (payoutsNeeded === null || perMonth <= 0) return null;
     return Math.ceil(payoutsNeeded / perMonth);
   }, [payoutsNeeded, payoutsPerMonth]);
 
