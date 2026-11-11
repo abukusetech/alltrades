@@ -479,10 +479,10 @@ export function DailyAnalysisClient() {
   const riskAmount = React.useMemo(() => {
     if (!analysis) return 0;
     return computeRiskAmount(
-      Number(currentAccount?.starting_capital ?? 0),
+      metrics.currentCapital > 0 ? metrics.currentCapital : Number(currentAccount?.starting_capital ?? 0),
       analysis.planned_risk_percent ?? 0
     );
-  }, [analysis, currentAccount]);
+  }, [analysis, currentAccount, metrics.currentCapital]);
 
   const expectedProfit = React.useMemo(
     () => computeExpectedProfit(riskAmount, rr),
@@ -778,7 +778,7 @@ export function DailyAnalysisClient() {
       {activeTab === "setup" && (
         <div className="space-y-4">
           <SectionIntro eyebrow="05 / TRADE PLAN" title="Define the trade before execution" description="Set direction, entry, invalidation and target. Review the calculated risk and reward before proceeding." />
-          <TradeSetupSection analysis={analysis} onUpdate={update} accountCapital={Number(currentAccount?.starting_capital ?? 0)} />
+          <TradeSetupSection analysis={analysis} onUpdate={update} accountCapital={metrics.currentCapital > 0 ? metrics.currentCapital : Number(currentAccount?.starting_capital ?? 0)} />
           <NewsCard analysis={analysis} onUpdate={update} />
         </div>
       )}
