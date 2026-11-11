@@ -23,6 +23,7 @@ import { INSTRUMENTS, RESULTS, STRATEGIES } from "@/lib/constants";
 import type { Trade, DailyAnalysis } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 import { useDailyAnalysesHistory } from "@/lib/data/daily-analysis-hooks";
+import { computePosition } from "@/lib/position-math";
 
 type SortKey = "trade_date" | "profit_loss" | "instrument" | "result";
 
@@ -49,16 +50,33 @@ export function JournalClient() {
   const openedAnalysisRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
-    if (!analysisIdFromUrl || !currentAccountId || analysesLoading) return;
+    if (!analysisIdFromUrl || !currentAccountId || !currentAccount || analysesLoading) return;
     if (openedAnalysisRef.current === analysisIdFromUrl) return;
     const linkedAnalysis = dailyAnalyses.find((item) => item.id === analysisIdFromUrl);
     if (!linkedAnalysis) return;
     openedAnalysisRef.current = analysisIdFromUrl;
     setEditing(null);
     setDetail(null);
-    setPrefillAnalysis(linkedAnalysis);
+    const linkedMetrics = computeAccountMetrics(currentAccount, trades, withdrawals);
+    const sized = computePosition({
+      instrument: linkedAnalysis.instrument,
+      direction: linkedAnalysis.planned_direction === "BUY" || linkedAnalysis.planned_direction === "SELL" ? linkedAnalysis.planned_direction : null,
+      entry: linkedAnalysis.planned_entry,
+      stopLoss: linkedAnalysis.planned_stop_loss,
+      takeProfit: linkedAnalysis.planned_take_profit,
+      riskPercent: linkedAnalysis.planned_risk_percent ?? 0,
+      balance: linkedMetrics.currentCapital > 0 ? linkedMetrics.currentCapital : Number(currentAccount.starting_capital ?? 0),
+      account: currentAccount,
+    });
+    setPrefillAnalysis({
+      ...linkedAnalysis,
+      computed_lot_size: sized.lotSize,
+      computed_risk_amount: sized.riskAmount,
+      planned_risk_amount: sized.riskAmount ?? linkedAnalysis.planned_risk_amount,
+      planned_rr: sized.rr ?? linkedAnalysis.planned_rr,
+    });
     setFormOpen(true);
-  }, [analysisIdFromUrl, currentAccountId, analysesLoading, dailyAnalyses]);
+  }, [analysisIdFromUrl, currentAccountId, currentAccount, analysesLoading, dailyAnalyses, trades, withdrawals]);
 
   const metrics = React.useMemo(
     () => computeAccountMetrics(currentAccount, trades, withdrawals),
