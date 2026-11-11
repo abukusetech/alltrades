@@ -44,7 +44,7 @@ export function TradeSetupSection({
 
   // Pip helpers
   function pipSize() {
-    return instrument === "XAUUSD / Gold" ? 0.1 : 0.0001;
+    return (instrument === "XAUUSD" || instrument === "XAUUSD / Gold") ? 0.1 : 0.0001;
   }
 
   function priceFromPips(pips: number, isSL: boolean) {
