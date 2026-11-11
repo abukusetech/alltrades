@@ -29,7 +29,6 @@ import {
   DEFAULT_LIQUIDITY,
   DEFAULT_END_OF_DAY,
   DEFAULT_TF,
-  computeConfirmationScore,
   computeRR,
   computeRiskAmount,
   computeExpectedProfit,
@@ -139,7 +138,7 @@ export function DailyAnalysisClient() {
   // Instrument — separate analyses per instrument
   const [activeInstrument, setActiveInstrument] = React.useState<string>("EURUSD");
   // Tabs
-  const [activeTab, setActiveTab] = React.useState<AnalysisTabKey>("htf");
+  const [activeTab, setActiveTab] = React.useState<AnalysisTabKey>("context");
 
   const { data: existing, isLoading, mutate } = useDailyAnalysis(
     currentAccountId,
@@ -513,8 +512,6 @@ export function DailyAnalysisClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slPips, rr, expectedProfit, riskAmount, analysis?.id]);
 
-  const checklist = analysis?.confirmation_checklist ?? DEFAULT_CHECKLIST;
-  const confirmScore = React.useMemo(() => computeConfirmationScore(checklist), [checklist]);
   const derivedStatus = analysis ? deriveStatus(analysis) : "ANALYSIS_CREATED";
 
   // ────────────────────────────────────────────────────────────
