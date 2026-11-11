@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { cn, formatCurrency, toDateKey } from "@/lib/utils";
+import { Select } from "@/components/ui/Select";
 
 const STATUS_LABEL: Record<GateStatus, string> = {
   ANALYSIS_INCOMPLETE: "ANALYSIS INCOMPLETE",
@@ -40,10 +41,11 @@ const STATUS_TONE: Record<GateStatus, "profit" | "loss" | "warn" | "neutral" | "
 
 export function TradeCheckClient() {
   const { currentAccount, currentAccountId } = useCurrentAccount();
+  const [instrument, setInstrument] = React.useState<"EURUSD" | "XAUUSD">("EURUSD");
   const { data: trades = [] } = useTrades(currentAccountId);
   const { data: withdrawals = [] } = useWithdrawals(currentAccountId);
   const today = toDateKey(new Date());
-  const { data: analysis, isLoading } = useDailyAnalysis(currentAccountId, today);
+  const { data: analysis, isLoading } = useDailyAnalysis(currentAccountId, today, instrument);
 
   const metrics = React.useMemo(
     () => computeAccountMetrics(currentAccount, trades, withdrawals),
@@ -89,14 +91,14 @@ export function TradeCheckClient() {
       <PageHeader
         title="Trade Check"
         subtitle="Strict execution gate. READY only when every condition is verified."
-        actions={<Badge tone={STATUS_TONE[gate.status]}>{STATUS_LABEL[gate.status]}</Badge>}
+        actions={<div className="flex items-center gap-2"><Select value={instrument} onChange={(e) => setInstrument(e.target.value as "EURUSD" | "XAUUSD")} options={["EURUSD", "XAUUSD"]} /><Badge tone={STATUS_TONE[gate.status]}>{STATUS_LABEL[gate.status]}</Badge></div>}
       />
 
       <AccountHeader account={currentAccount} currentCapital={metrics.currentCapital} />
       <WeeklyLockBanner />
 
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface-soft/70 p-3">
-        <Link href="/daily-analysis">
+        <Link href={`/daily-analysis?instrument=${instrument}`}>
           <Button variant="outline" size="sm">Review Daily Analysis</Button>
         </Link>
         <Link href="/journal">
