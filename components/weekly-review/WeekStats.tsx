@@ -20,7 +20,7 @@ export function WeekStats({ week }: WeekStatsProps) {
     week.biggestLosingDay < 0 ? "text-loss-text" : "text-ink-700";
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <Stat label="Total trades" value={String(week.totalTrades)} />
       <Stat
         label="Win rate"
@@ -90,11 +90,11 @@ function Stat({
 }) {
   return (
     <Card>
-      <CardBody className="p-4">
-        <div className="eyebrow">{label}</div>
+      <CardBody className="relative overflow-hidden p-4 before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-brand-500">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">{label}</div>
         <div
           className={cn(
-            "tabular mt-1 text-lg font-semibold text-ink-900",
+            "tabular mt-2 text-xl font-semibold tracking-tight text-ink-950",
             valueClass
           )}
         >
