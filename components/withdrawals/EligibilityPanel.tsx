@@ -12,6 +12,7 @@ export interface EligibilityPanelProps {
 export function EligibilityPanel({ metrics, onRecord }: EligibilityPanelProps) {
   const consistencyOk = metrics.consistencyScore !== null && metrics.consistencyScore <= metrics.maxConsistencyPercent;
   const eligible = metrics.withdrawalEligible;
+  const targetPercent = metrics.startingCapital > 0 ? (metrics.withdrawalTarget / metrics.startingCapital) * 100 : 0;
 
   return (
     <Card>
@@ -31,7 +32,7 @@ export function EligibilityPanel({ metrics, onRecord }: EligibilityPanelProps) {
               ? "Target reached"
               : "Target not reached"
           }
-          detail={`Requires ${formatPercent(Number(metrics.maxConsistencyPercent) ? 4 : 4, 0)} of starting capital in profit.`}
+          detail={`Requires ${formatPercent(targetPercent, 2)} of starting capital in profit.`}
         />
         <GateRow
           ok={consistencyOk}
@@ -39,7 +40,7 @@ export function EligibilityPanel({ metrics, onRecord }: EligibilityPanelProps) {
           value={
             consistencyOk
               ? `Within limit (${formatPercent(metrics.consistencyScore, 1)})`
-              : `Above limit (${formatPercent(metrics.consistencyScore, 1)})`
+              : metrics.consistencyScore === null ? "Not available yet" : `Above limit (${formatPercent(metrics.consistencyScore, 1)})`
           }
           detail={`Must be ≤ ${formatPercent(metrics.maxConsistencyPercent, 0)}.`}
         />
@@ -57,7 +58,7 @@ export function EligibilityPanel({ metrics, onRecord }: EligibilityPanelProps) {
             : metrics.withdrawalBlockReason === "TARGET_NOT_REACHED"
               ? "Target not reached — continue trading until the profit target is met."
               : metrics.withdrawalBlockReason === "CONSISTENCY_ABOVE_LIMIT"
-                ? "Consistency above limit — continue trading until the score falls to 20% or below."
+                ? `Consistency above limit — the score must fall to ${formatPercent(metrics.maxConsistencyPercent, 0)} or below.`
                 : "Withdrawal is currently blocked."}
         </div>
 
