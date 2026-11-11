@@ -100,9 +100,9 @@ export function WithdrawalHistory({
                       <td className="px-4 py-2.5">
                         <Badge
                           tone={
-                            w.status === "Paid" || w.status === "Approved"
+                            w.status === "Paid"
                               ? "profit"
-                              : w.status === "Pending"
+                              : w.status === "Pending" || w.status === "Approved" || w.status === "Recorded"
                                 ? "warn"
                                 : "neutral"
                           }
