@@ -808,7 +808,7 @@ export function DailyAnalysisClient() {
       <LinkedTradeBanner accountId={currentAccountId} dailyAnalysisId={analysis.id} tradePlanId={analysis.active_plan_id ?? null} />
 
       {/* RECENT ANALYSES */}
-      {history.length > 0 && <HistoryCard history={history} onPick={(d, inst) => { setDate(d); setActiveInstrument(inst); }} />}
+      {activeTab === "review" && history.length > 0 && <HistoryCard history={history} onPick={(d, inst) => { setDate(d); setActiveInstrument(inst); }} />}
     </div>
   );
 }
