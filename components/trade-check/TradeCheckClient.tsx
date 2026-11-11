@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ClipboardCheck, CheckCircle2, XCircle, AlertTriangle, Circle } from "lucide-react";
 import { useCurrentAccount } from "@/components/layout/AppShell";
 import { useTrades, useWithdrawals } from "@/lib/data/hooks";
@@ -41,7 +42,8 @@ const STATUS_TONE: Record<GateStatus, "profit" | "loss" | "warn" | "neutral" | "
 
 export function TradeCheckClient() {
   const { currentAccount, currentAccountId } = useCurrentAccount();
-  const [instrument, setInstrument] = React.useState<"EURUSD" | "XAUUSD">("EURUSD");
+  const searchParams = useSearchParams();
+  const [instrument, setInstrument] = React.useState<"EURUSD" | "XAUUSD">(() => searchParams.get("instrument") === "XAUUSD" ? "XAUUSD" : "EURUSD");
   const { data: trades = [] } = useTrades(currentAccountId);
   const { data: withdrawals = [] } = useWithdrawals(currentAccountId);
   const today = toDateKey(new Date());
