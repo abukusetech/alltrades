@@ -104,9 +104,9 @@ export function DashboardClient() {
         title="Dashboard"
         subtitle={
           isAll
-            ? "Combined view of Maven and Personal accounts — kept separate below."
+            ? "A consolidated view of your trading accounts, with each account type kept separate."
             : isMaven
-              ? "Maven Prop Firm account performance, discipline and withdrawal status."
+              ? `${primaryAccount?.broker || primaryAccount?.maven_rules?.program_label || "Funded account"} performance, discipline and payout status.`
               : isPersonal
                 ? "Personal Capital account performance and risk plan."
                 : "Funded account performance, discipline and withdrawal status."
@@ -157,8 +157,8 @@ export function DashboardClient() {
                 />
               )}
 
-              <div className="grid gap-4 lg:grid-cols-3">
-                <div className="lg:col-span-2 space-y-4">
+              <div className="grid gap-4 xl:grid-cols-3">
+                <div className="space-y-4 xl:col-span-2">
                   {/* Withdrawal Status — MAVEN ONLY */}
                   {isMaven && <WithdrawalStatusCard metrics={metrics} />}
                   <RecentTradesCard trades={recentTrades} />
