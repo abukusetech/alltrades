@@ -831,7 +831,7 @@ export function DailyAnalysisClient() {
 
       {/* HEADER SUMMARY */}
       <Card>
-        <CardBody className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <CardBody className="grid grid-cols-2 gap-4 rounded-xl bg-gradient-to-r from-brand-50/70 to-white p-4 sm:grid-cols-4">
           <HeaderStat label="Analysis date" value={formatDateLong(new Date(date + "T00:00:00"))} />
           <HeaderStat label="Status" value={STATUS_LABEL[derivedStatus] ?? derivedStatus} tone={STATUS_TONE[derivedStatus]} />
           <HeaderStat
@@ -1285,7 +1285,7 @@ function HistoryCard({ history, onPick }: { history: DailyAnalysis[]; onPick: (d
       <CardBody className="p-0">
         <div className="divide-y divide-border">
           {history.slice(0, 30).map((a) => (
-            <button key={a.id} type="button" onClick={() => onPick(a.analysis_date, a.instrument)} className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-soft">
+            <button key={a.id} type="button" onClick={() => onPick(a.analysis_date, a.instrument)} className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors hover:bg-brand-50/40">
               <div className="min-w-0">
                 <div className="text-xs font-medium text-ink-900">{formatDateLong(new Date(a.analysis_date + "T00:00:00"))}</div>
                 <div className="mt-0.5 text-3xs text-ink-500 flex items-center gap-1">
