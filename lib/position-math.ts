@@ -121,6 +121,8 @@ export function computePosition(input: PositionInput): PositionResult {
     return { ...EMPTY, instrument: sym, reason: "Enter a risk percentage" };
   if (balance <= 0)
     return { ...EMPTY, instrument: sym, reason: "Account balance is zero" };
+  if (account?.account_currency && account.account_currency.toUpperCase() !== "USD")
+    return { ...EMPTY, instrument: sym, reason: `Exact ${account.account_currency.toUpperCase()} conversion is not configured. Use a USD-denominated account or configure verified conversion support before sizing.` };
 
   if (direction === "BUY") {
     if (stopLoss >= entry)
