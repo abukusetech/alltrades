@@ -81,6 +81,11 @@ export function VolatilityCard({ symbol }: { symbol: "EURUSD" | "XAUUSD" }) {
 
         {data.providerStatus === "ready" && (
           <>
+            {data.warning && (
+              <div className="rounded border border-warn-border bg-warn-bg px-3 py-2 text-3xs text-warn-text">
+                {data.warning}
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-3">
               <Stat
                 label="ATR (14)"
