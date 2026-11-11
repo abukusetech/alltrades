@@ -174,7 +174,9 @@ export function TradeCheckClient() {
               >
                 {gate.ready
                   ? "All mandatory conditions passed. Proceed to the Journal to record the trade."
-                  : `Blocked — ${gate.blockers.length} reason${gate.blockers.length === 1 ? "" : "s"} listed above.`}
+                  : gate.status === "TRADE_TAKEN"
+                    ? "A trade is already recorded for today. The daily execution gate is now locked."
+                    : `Blocked — ${gate.blockers.length} reason${gate.blockers.length === 1 ? "" : "s"} listed above.`}
               </div>
               {gate.ready && (
                 <Link href={`/journal?analysis=${analysis.id}`}>
