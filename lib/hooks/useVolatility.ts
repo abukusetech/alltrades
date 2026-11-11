@@ -64,10 +64,10 @@ export function useVolatility(symbol: "EURUSD" | "XAUUSD", interval = "15min"): 
           `/api/market/candles?symbol=${encodeURIComponent(apiSymbol)}&interval=${interval}&outputsize=100`
         );
 
-        if (!res.ok) throw new Error("Market data unavailable");
         const json = await res.json();
-
-        if (json.error) throw new Error(json.error);
+        if (!res.ok || json.error) {
+          throw new Error(json.error || `Market data provider returned HTTP ${res.status}`);
+        }
 
         const candles = (json.values || []).map((c: any) => ({
           datetime: c.datetime,
