@@ -146,7 +146,7 @@ function itemComplete(
         const pipSize =
           analysis.instrument === "USDJPY" || analysis.instrument === "GBPJPY"
             ? 0.01
-            : analysis.instrument === "XAUUSD / Gold"
+            : (analysis.instrument === "XAUUSD" || analysis.instrument === "XAUUSD / Gold")
               ? 0.1
               : analysis.instrument === "NAS100" || analysis.instrument === "US30" || analysis.instrument === "SPX500"
                 ? 1
