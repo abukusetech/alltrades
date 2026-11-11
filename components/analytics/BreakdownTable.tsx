@@ -38,7 +38,7 @@ export function BreakdownTable({
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm">
-              <thead className="bg-surface-muted text-3xs uppercase tracking-wide text-ink-500">
+              <thead className="bg-surface-muted text-[10px] uppercase tracking-[0.1em] text-ink-500">
                 <tr>
                   <th className="px-4 py-2 text-left font-medium">Group</th>
                   <th className="px-4 py-2 text-right font-medium">Trades</th>
@@ -62,8 +62,8 @@ export function BreakdownTable({
                         ? "text-loss-text"
                         : "text-ink-700";
                   return (
-                    <tr key={r.key} className="hover:bg-surface-soft">
-                      <td className="px-4 py-2.5 text-xs font-medium text-ink-900">
+                    <tr key={r.key} className="transition-colors hover:bg-brand-50/40">
+                      <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-ink-900">
                         {r.key}
                       </td>
                       <td className="tabular px-4 py-2.5 text-right text-xs text-ink-700">
@@ -77,7 +77,7 @@ export function BreakdownTable({
                       </td>
                       <td
                         className={cn(
-                          "tabular px-4 py-2.5 text-right text-xs font-semibold",
+                          "tabular whitespace-nowrap px-4 py-3 text-right text-xs font-semibold",
                           plClass
                         )}
                       >
