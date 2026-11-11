@@ -22,6 +22,7 @@ import {
   Sunrise,
   Wallet,
   Activity,
+  BrainCircuit,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,7 @@ const WORKSPACE: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/daily-analysis", label: "Daily Analysis", icon: Sunrise },
   { href: "/market-intelligence", label: "Market Intelligence", icon: Activity },
+  { href: "/ai-assistant", label: "AI Assistant", icon: BrainCircuit },
   { href: "/trade-check", label: "Trade Check", icon: ClipboardList },
   { href: "/position-calculator", label: "Position Calculator", icon: Calculator },
   { href: "/journal", label: "Journal", icon: BookOpen },
