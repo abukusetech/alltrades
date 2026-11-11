@@ -85,16 +85,13 @@ export function WithdrawalsClient() {
     );
   }
 
-  const visibleWithdrawals =
-    tab === "maven" ? mavenWithdrawals : personalWithdrawals;
-
   return (
     <div className="space-y-6">
       <PageHeader
         title="Withdrawals"
         subtitle={
           tab === "maven"
-            ? "Maven payouts requested and received."
+            ? `${providerLabel} payouts requested and received.`
             : "Cash withdrawn from your personal broker account."
         }
         actions={
