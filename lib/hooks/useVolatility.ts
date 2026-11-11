@@ -11,6 +11,7 @@ export interface VolatilityData {
   lastUpdated: string | null;
   providerStatus: "loading" | "ready" | "error" | "closed";
   errorMessage: string | null;
+  warning: string | null;
 }
 
 export function useVolatility(symbol: "EURUSD" | "XAUUSD", interval = "15min"): VolatilityData {
@@ -27,6 +28,7 @@ export function useVolatility(symbol: "EURUSD" | "XAUUSD", interval = "15min"): 
     lastUpdated: null,
     providerStatus: "loading",
     errorMessage: null,
+    warning: null,
   });
 
   React.useEffect(() => {
@@ -88,9 +90,10 @@ export function useVolatility(symbol: "EURUSD" | "XAUUSD", interval = "15min"): 
           symbol,
           interval,
           result,
-          lastUpdated: new Date().toISOString(),
+          lastUpdated: json.cachedAt ?? new Date().toISOString(),
           providerStatus: "ready",
           errorMessage: null,
+          warning: typeof json.warning === "string" ? json.warning : null,
         });
       } catch (err) {
         if (!mounted) return;
