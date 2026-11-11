@@ -274,8 +274,8 @@ export function computeGate(input: GateInput): GateResult {
 
   let status: GateStatus;
   if (!analysis) status = "ANALYSIS_INCOMPLETE";
-  else if (input.hasTradeToday) status = "TRADE_TAKEN";
-  else if (decision === "NO_TRADE") status = "INVALIDATED";
+  else if (input.hasTradeToday || analysis.status === "TRADE_TAKEN") status = "TRADE_TAKEN";
+  else if (decision === "NO_TRADE" || analysis.final_decision === "NO_TRADE" || analysis.final_decision === "INVALIDATED" || analysis.status === "NO_TRADE" || analysis.status === "INVALIDATED") status = "INVALIDATED";
   else if (failed.length > 0) status = "BLOCKED";
   else if (unconfirmed.length > 0) status = "WAITING_FOR_CONFIRMATION";
   else if (decision !== "CONFIRMED") status = "WAITING_FOR_SETUP";
