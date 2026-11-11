@@ -100,11 +100,7 @@ export function LoginForm() {
       </div>
 
       <div className="mt-5 border-t border-border pt-4 text-center text-2xs text-ink-500">
-        {typeof window !== "undefined" && new URLSearchParams(window.location.search).get("password-reset") === "success" && (
-          <p className="mb-3 rounded border border-border bg-surface-soft px-3 py-2 text-ink-700">
-            Your password has been updated. Please log in with your new password.
-          </p>
-        )}
+
         Don&apos;t have an account?{" "}
         <Link
           href="/signup"
