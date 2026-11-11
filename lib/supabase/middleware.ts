@@ -8,6 +8,7 @@ type CookieToSet = {
 };
 
 const PUBLIC_PATHS = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/auth/callback"];
+const AUTH_FLOW_PATHS = ["/reset-password", "/auth/callback"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -42,6 +43,7 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.includes(pathname);
+  const isAuthFlow = AUTH_FLOW_PATHS.includes(pathname);
 
   if (!user && !isPublic) {
     const redirectUrl = request.nextUrl.clone();
@@ -50,7 +52,8 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (user && isPublic) {
+  // Keep authenticated recovery/callback requests on their intended route.
+  if (user && isPublic && !isAuthFlow) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/dashboard";
     redirectUrl.search = "";
