@@ -145,9 +145,9 @@ export function EquityBars({ account, trades }: EquityBarsProps) {
               type="button"
               onClick={() => setRange(r.key)}
               className={cn(
-                "rounded px-2 py-1 text-3xs font-medium transition-colors",
+                "rounded-md px-2.5 py-1.5 text-3xs font-semibold transition-colors",
                 range === r.key
-                  ? "bg-brand-50 text-brand-700"
+                  ? "bg-brand-600 text-white shadow-sm"
                   : "text-ink-500 hover:bg-surface-muted hover:text-ink-800"
               )}
             >
@@ -178,7 +178,7 @@ export function EquityBars({ account, trades }: EquityBarsProps) {
             </div>
 
             {/* Bar chart — balance per period */}
-            <div className="relative h-64 w-full">
+            <div className="relative h-64 w-full overflow-x-auto rounded-lg bg-surface-soft/40 p-2">
               {/* Grid lines */}
               <div className="absolute inset-0 flex flex-col justify-between">
                 {[0, 1, 2, 3, 4].map((i) => (
