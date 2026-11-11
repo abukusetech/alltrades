@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { Save, ShieldCheck, SlidersHorizontal, UserRound } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -113,6 +114,7 @@ export function AccountRulesEditor() {
   const { currentAccount, accounts } = useCurrentAccount();
   const supabase = React.useMemo(() => createClient(), []);
   const toast = useToast();
+  const router = useRouter();
   const [form, setForm] = React.useState<FormState | null>(null);
   const [original, setOriginal] = React.useState<FormState | null>(null);
   const [saving, setSaving] = React.useState(false);
@@ -218,7 +220,7 @@ export function AccountRulesEditor() {
       setForm(next);
       setOriginal(next);
       toast.success("Account rules saved", "These settings now apply to this account.");
-      window.location.reload();
+      router.refresh();
     } catch (error) {
       toast.error(
         "Could not save account rules",
