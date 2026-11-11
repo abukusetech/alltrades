@@ -29,7 +29,7 @@ export function CashFlowByType({
     for (const t of transactions) {
       if (t.reversed_by) continue;
       
-      const accId = (t as unknown as { account_id?: string | null }).account_id;
+      const accId = t.account_id ?? null;
       const type = accId ? accountTypeById.get(accId) ?? "UNATTRIBUTED" : "UNATTRIBUTED";
       
       const bucket =
