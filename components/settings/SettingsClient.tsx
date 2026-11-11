@@ -1,43 +1,36 @@
-﻿"use client";
+"use client";
 
-import * as React from "react";
 import { Plus } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useCurrentAccount } from "@/components/layout/AppShell";
 import { AccountForm } from "./AccountForm";
 import { AccountList } from "./AccountList";
-import { SystemRulesCard } from "./SystemRulesCard";
 import { DeleteAccountCard } from "./DeleteAccountCard";
 import { AccountingSettingsCard } from "./AccountingSettingsCard";
-import { MavenRulesCard } from "./MavenRulesCard";
 import { AccountTypeCard } from "./AccountTypeCard";
 import { PersonalTradingPlanEditor } from "./PersonalTradingPlanEditor";
+import { AccountRulesEditor } from "./AccountRulesEditor";
 
 export function SettingsClient() {
-  const { accounts, currentAccount } = useCurrentAccount();
-
-  // Pick the first personal account to show its plan editor
-  const personalAccount = React.useMemo(
-    () => accounts.find((a) => a.account_type === "PERSONAL") ?? null,
-    [accounts]
-  );
+  const { accounts } = useCurrentAccount();
+  const hasPersonalAccounts = accounts.some((account) => account.account_type === "PERSONAL");
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Settings"
-        subtitle="Accounts, rules, and your personal trading plan."
+        subtitle="Manage your accounts, configure trading rules, and personalize your trading workspace."
+      />
+
+      <AccountTypeCard
+        accounts={accounts}
+        onClassified={() => window.location.reload()}
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
-          <AccountTypeCard
-            accounts={accounts}
-            onClassified={() => window.location.reload()}
-          />
-
-          <PersonalTradingPlanEditor accounts={accounts} />
+        <div className="space-y-6 lg:col-span-2">
+          {hasPersonalAccounts && <PersonalTradingPlanEditor accounts={accounts} />}
 
           <Card>
             <CardHeader>
@@ -53,8 +46,7 @@ export function SettingsClient() {
             <CardHeader>
               <CardTitle>Your Accounts</CardTitle>
               <span className="text-2xs text-ink-500">
-                {accounts.length}{" "}
-                {accounts.length === 1 ? "account" : "accounts"}
+                {accounts.length} {accounts.length === 1 ? "account" : "accounts"}
               </span>
             </CardHeader>
             <CardBody>
@@ -63,14 +55,11 @@ export function SettingsClient() {
           </Card>
 
           <AccountingSettingsCard />
-
           <DeleteAccountCard />
         </div>
 
         <div className="space-y-6">
-          <SystemRulesCard account={currentAccount} />
-
-          <MavenRulesCard />
+          <AccountRulesEditor />
 
           <Card>
             <CardHeader>
@@ -78,11 +67,10 @@ export function SettingsClient() {
             </CardHeader>
             <CardBody>
               <p className="text-2xs leading-relaxed text-ink-600">
-                Market conditions apply, including spread and slippage.
-                ALLTRADES does not control or represent broker execution
-                conditions and does not connect to any broker account. Every
-                metric shown in the application is derived from the trades,
-                analyses and withdrawals you record here.
+                Spread, slippage, liquidity and broker execution can affect
+                results. ALLTRADES does not connect to a broker or control
+                execution. Metrics are calculated from the trades, analyses
+                and withdrawals you record.
               </p>
             </CardBody>
           </Card>
@@ -91,4 +79,3 @@ export function SettingsClient() {
     </div>
   );
 }
-
