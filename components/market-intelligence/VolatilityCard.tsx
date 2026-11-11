@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 const CLASS_TONE = {
   LOW: "neutral" as const,
-  NORMAL: "profit" as const,
+  NORMAL: "neutral" as const,
   HIGH: "warn" as const,
   EXTREME: "loss" as const,
   UNAVAILABLE: "neutral" as const,
@@ -113,11 +113,11 @@ export function VolatilityCard({ symbol }: { symbol: "EURUSD" | "XAUUSD" }) {
                 tone={
                   data.result.relativeToAverage === null
                     ? undefined
-                    : data.result.relativeToAverage > 1.5
+                    : data.result.relativeToAverage > 2
                       ? "loss"
-                      : data.result.relativeToAverage > 1.2
+                      : data.result.relativeToAverage > 1.3
                         ? "warn"
-                        : "profit"
+                        : undefined
                 }
               />
             </div>
