@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { ClipboardCheck, Plus } from "lucide-react";
 import { useCurrentAccount } from "@/components/layout/AppShell";
 import {
   useTradesForFilter,
@@ -120,8 +120,8 @@ export function DashboardClient() {
                     : "Funded account performance, discipline and withdrawal status."}
             </p>
           </div>
-          <Link href="/journal" className="relative shrink-0">
-            <Button leftIcon={<Plus className="h-3.5 w-3.5" />}>New Trade</Button>
+          <Link href="/trade-check" className="relative shrink-0">
+            <Button leftIcon={<ClipboardCheck className="h-3.5 w-3.5" />}>Trade Check</Button>
           </Link>
         </div>
       </div>
@@ -152,6 +152,7 @@ export function DashboardClient() {
             <Link href="/daily-analysis" className="rounded-lg border border-border bg-surface-soft px-3 py-2 text-xs font-medium text-ink-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700">Daily Analysis</Link>
             <Link href="/trade-check" className="rounded-lg border border-border bg-surface-soft px-3 py-2 text-xs font-medium text-ink-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700">Trade Check</Link>
             <Link href="/market-intelligence" className="rounded-lg border border-border bg-surface-soft px-3 py-2 text-xs font-medium text-ink-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700">Market Intelligence</Link>
+            <Link href="/journal" className="rounded-lg border border-border bg-surface-soft px-3 py-2 text-xs font-medium text-ink-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700">Journal</Link>
           </nav>
 
           <section className="space-y-3">
