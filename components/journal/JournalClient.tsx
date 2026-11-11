@@ -22,6 +22,7 @@ import { TradeDetailModal } from "./TradeDetailModal";
 import { INSTRUMENTS, RESULTS, STRATEGIES } from "@/lib/constants";
 import type { Trade, DailyAnalysis } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
+import { useDailyAnalysesHistory } from "@/lib/data/daily-analysis-hooks";
 
 type SortKey = "trade_date" | "profit_loss" | "instrument" | "result";
 
@@ -43,6 +44,21 @@ export function JournalClient() {
   const [detail, setDetail] = React.useState<Trade | null>(null);
   const [prefillAnalysis, setPrefillAnalysis] = React.useState<DailyAnalysis | null>(null);
   const searchParams = useSearchParams();
+  const analysisIdFromUrl = searchParams.get("analysis");
+  const { data: dailyAnalyses = [], isLoading: analysesLoading } = useDailyAnalysesHistory(currentAccountId, 60);
+  const openedAnalysisRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    if (!analysisIdFromUrl || !currentAccountId || analysesLoading) return;
+    if (openedAnalysisRef.current === analysisIdFromUrl) return;
+    const linkedAnalysis = dailyAnalyses.find((item) => item.id === analysisIdFromUrl);
+    if (!linkedAnalysis) return;
+    openedAnalysisRef.current = analysisIdFromUrl;
+    setEditing(null);
+    setDetail(null);
+    setPrefillAnalysis(linkedAnalysis);
+    setFormOpen(true);
+  }, [analysisIdFromUrl, currentAccountId, analysesLoading, dailyAnalyses]);
 
   const metrics = React.useMemo(
     () => computeAccountMetrics(currentAccount, trades, withdrawals),
