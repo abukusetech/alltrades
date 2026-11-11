@@ -45,9 +45,7 @@ export function AnalyticsStatsCards({ metrics }: AnalyticsStatsCardsProps) {
       {/* Hidden but visually balanced row */}
       
       
-      <div className="hidden lg:block" />
-      <div className="hidden lg:block" />
-      <div className="sm:col-span-2 lg:col-span-4">
+      <div className="sm:col-span-2 xl:col-span-4">
         <Card>
           <CardBody className="grid grid-cols-2 gap-4 rounded-lg bg-surface-soft/60 p-4 sm:grid-cols-4">
             <Small
