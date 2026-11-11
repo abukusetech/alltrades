@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import type { Withdrawal } from "@/lib/types";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 
 export interface WithdrawalHistoryProps {
   withdrawals: Withdrawal[];
@@ -28,6 +28,8 @@ export function WithdrawalHistory({
   const [deleting, setDeleting] = React.useState(false);
 
   const total = withdrawals.reduce((s, w) => s + (Number(w.amount) || 0), 0);
+  const received = withdrawals.filter((w) => w.status === "Paid").reduce((s, w) => s + (Number(w.amount) || 0), 0);
+  const awaitingPayment = withdrawals.filter((w) => w.status === "Pending" || w.status === "Approved").reduce((s, w) => s + (Number(w.amount) || 0), 0);
 
   async function confirm() {
     if (!pending) return;
@@ -52,10 +54,7 @@ export function WithdrawalHistory({
           <div>
             <CardTitle>Withdrawal History</CardTitle>
             <p className="mt-1 text-3xs text-ink-500">
-              Total recorded:{" "}
-              <span className="tabular font-medium text-ink-700">
-                {formatCurrency(total)}
-              </span>
+              {formatCurrency(total)} recorded across all statuses
             </p>
           </div>
           <Badge tone="neutral">
@@ -63,9 +62,14 @@ export function WithdrawalHistory({
           </Badge>
         </CardHeader>
 
-        <CardBody className="p-0">
+        <CardBody className="space-y-4 p-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <HistoryMetric label="Total recorded" value={formatCurrency(total)} />
+            <HistoryMetric label="Received" value={formatCurrency(received)} tone="profit" />
+            <HistoryMetric label="Awaiting payment" value={formatCurrency(awaitingPayment)} tone="warn" />
+          </div>
           {withdrawals.length === 0 ? (
-            <div className="p-6">
+            <div className="py-3">
               <EmptyState
                 title="No withdrawals recorded"
                 description="Once you are eligible, record a withdrawal to see it here."
@@ -73,7 +77,7 @@ export function WithdrawalHistory({
               />
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="-mx-4 overflow-x-auto">
               <table className="w-full border-collapse text-sm">
                 <thead className="bg-surface-muted text-3xs uppercase tracking-wide text-ink-500">
                   <tr>
@@ -144,5 +148,14 @@ export function WithdrawalHistory({
         loading={deleting}
       />
     </>
+  );
+}
+
+function HistoryMetric({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "profit" | "warn" }) {
+  return (
+    <div className="rounded-md border border-border bg-surface-soft px-3 py-2">
+      <p className="text-3xs text-ink-500">{label}</p>
+      <p className={cn("tabular mt-1 text-sm font-semibold", tone === "profit" ? "text-profit-text" : tone === "warn" ? "text-warn-text" : "text-ink-900")}>{value}</p>
+    </div>
   );
 }
