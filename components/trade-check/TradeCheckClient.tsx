@@ -95,6 +95,15 @@ export function TradeCheckClient() {
       <AccountHeader account={currentAccount} currentCapital={metrics.currentCapital} />
       <WeeklyLockBanner />
 
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface-soft/70 p-3">
+        <Link href="/daily-analysis">
+          <Button variant="outline" size="sm">Review Daily Analysis</Button>
+        </Link>
+        <Link href="/journal">
+          <Button variant="outline" size="sm">Open Journal</Button>
+        </Link>
+      </div>
+
       {isLoading ? (
         <div className="py-12 text-center text-2xs text-ink-500">Loading today's analysis…</div>
       ) : !analysis ? (
