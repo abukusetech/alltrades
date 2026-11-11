@@ -55,6 +55,7 @@ export function useVolatility(symbol: "EURUSD" | "XAUUSD", interval = "15min"): 
               lastUpdated: null,
               providerStatus: "closed",
               errorMessage: null,
+              warning: null,
             });
           }
           return;
