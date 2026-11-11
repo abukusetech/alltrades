@@ -111,7 +111,7 @@ export function SessionsPanel() {
                     <div className="mt-3 rounded bg-surface-muted px-2 py-2 text-center">
                       <div className="text-3xs font-medium text-ink-500 uppercase tracking-wide">Status</div>
                       <div className="mt-0.5 text-xs font-bold text-ink-700">
-                        {market.isOpen ? "Closed" : market.isOpen ? `Starts in ${formatCountdown(status.untilOpenSecs)}` : "Forex market closed"}
+                        {market.isOpen ? "Closed" : !market.isOpen ? "Forex market closed" : nextWeek ? "After weekly market reopen" : `Starts in ${formatCountdown(status.untilOpenSecs)}`}
                       </div>
                     </div>
                   )}
@@ -135,12 +135,13 @@ export function SessionsPanel() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {KILL_ZONES.map((kz) => {
               const status = market.isOpen ? getKillZoneStatus(kz, now) : { status: "CLOSED", remainingSecs: 0, untilOpenSecs: 0 };
+              const nextWeek = market.isOpen && status.status !== "ACTIVE" && status.untilOpenSecs >= marketSecondsRemaining;
               return (
                 <div key={kz.key} className="rounded-lg border border-border bg-surface-soft p-3">
                   <div className="flex items-center justify-between">
                     <span className="text-2xs font-semibold text-ink-900">{kz.name}</span>
                     <Badge tone={status.status === "ACTIVE" ? "warn" : "neutral"}>
-                      {status.status === "ACTIVE" ? "ACTIVE" : market.isOpen ? "UPCOMING" : "CLOSED"}
+                      {status.status === "ACTIVE" ? "ACTIVE" : nextWeek ? "NEXT WEEK" : market.isOpen ? "UPCOMING" : "CLOSED"}
                     </Badge>
                   </div>
                   <div className="mt-2 text-3xs text-ink-500">
