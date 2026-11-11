@@ -193,20 +193,21 @@ export function computeGate(input: GateInput): GateResult {
   ] as const;
   const newStates = (analysis?.confirmation_states ?? {}) as Record<string, string | undefined>;
   const hasNewConfirmationModel = Object.keys(newStates).length > 0;
+  const newsBlocked = account?.forbid_high_impact_news === true && analysis?.news_major === true;
   const newConfirmationsReady = hasNewConfirmationModel &&
     newConfirmationKeys.every(([key]) =>
-      newStates[key] === "YES" ||
-      (key === "no_news_exposure" && newStates[key] === "NA" && account?.forbid_high_impact_news !== true)
+      newStates[key] === "YES" || (key === "no_news_exposure" && newStates[key] === "NA" && !newsBlocked)
     );
 
   if (hasNewConfirmationModel) {
     for (const [key, label] of newConfirmationKeys) {
       const state = newStates[key];
+      const notApplicableAllowed = key === "no_news_exposure" && state === "NA" && !newsBlocked;
       checks.push({
         key: `confirm_${key}`,
         label,
-        status: state === "YES" ? "PASS" : state === "NO" ? "FAIL" : "NOT_CONFIRMED",
-        reason: state === "YES" ? null : state === "NO" ? "Marked as not satisfied" : "Not explicitly confirmed",
+        status: state === "YES" || notApplicableAllowed ? "PASS" : state === "NO" ? "FAIL" : "NOT_CONFIRMED",
+        reason: state === "YES" || notApplicableAllowed ? null : state === "NO" ? "Marked as not satisfied" : "Not explicitly confirmed",
         severity: "mandatory",
       });
     }
@@ -231,7 +232,6 @@ export function computeGate(input: GateInput): GateResult {
   }
 
   // Account-specific news restrictions are authoritative.
-  const newsBlocked = account?.forbid_high_impact_news === true && analysis?.news_major === true;
   checks.push({
     key: "news_restriction",
     label: "Account news restriction respected",
