@@ -12,7 +12,7 @@ export interface MarketStatus {
 export function getTzParts(date: Date, timeZone: string) {
   const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone,
-    hour12: false,
+    hourCycle: "h23",
     weekday: "short",
     year: "numeric",
     month: "2-digit",
