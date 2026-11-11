@@ -353,9 +353,8 @@ export function WithdrawalFormModal({
             </Field>
 
             <div className="rounded border border-border bg-surface-soft px-3 py-2 text-3xs text-ink-500">
-              Personal withdrawals do not go through Maven's profit split,
-              consistency rule, or payout eligibility. The amount reduces your
-              personal account capital by exactly what you withdraw.
+              Personal withdrawals are separate from prop firm payout splits.
+              Record the amount actually taken from your personal trading capital.
             </div>
           </>
         )}
