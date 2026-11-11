@@ -188,16 +188,18 @@ export function AccountingClient() {
     .filter((t) => t.kind === "withdrawal_received" && !t.reversed_by)
     .reduce((s, t) => s + Number(t.amount_usd), 0);
 
-  const totalExpenses = transactions
-    .filter(
-      (t) =>
-        (t.kind === "expense" || t.kind === "account_purchase") && !t.reversed_by
-    )
+  // Keep operating costs separate from account acquisition costs.
+  // Both remain cash outflows, but reporting them in one card double-counts
+  // account purchases visually and makes operating performance misleading.
+  const operatingExpenses = transactions
+    .filter((t) => t.kind === "expense" && !t.reversed_by)
     .reduce((s, t) => s + Number(t.amount_usd), 0);
 
   const totalAccountPurchaseCost = transactions
     .filter((t) => t.kind === "account_purchase" && !t.reversed_by)
     .reduce((s, t) => s + Number(t.amount_usd), 0);
+
+  const totalExpenses = operatingExpenses + totalAccountPurchaseCost;
 
   const totalSavingsTransfers = transactions
     .filter((t) => t.kind === "savings_deposit" && !t.reversed_by)
@@ -353,6 +355,17 @@ export function AccountingClient() {
             accounts={accounts}
           />
 
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold text-ink-900">Financial overview</h2>
+              <p className="mt-0.5 text-2xs text-ink-500">
+                Period activity is shown below; fund balances reflect your current lifetime ledger position.
+              </p>
+            </div>
+            <span className="rounded-full border border-border bg-surface-soft px-2.5 py-1 text-3xs font-medium text-ink-600">
+              {transactions.length} transactions in period
+            </span>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <SummaryCard label="Withdrawals received" value={formatCurrency(totalWithdrawals)} hint={`${period.from} → ${period.to}`} tone={totalWithdrawals > 0 ? "profit" : "neutral"} />
                 <SummaryCard label="Operating cash" value={formatCurrency(balance("business_cash"))} tone={balance("business_cash") < 0 ? "loss" : "neutral"} />
@@ -360,7 +373,7 @@ export function AccountingClient() {
                 <SummaryCard label="Personal savings" value={formatCurrency(balance("personal_savings"))} tone={balance("personal_savings") > 0 ? "profit" : "neutral"} />
                 <SummaryCard label="Emergency reserve" value={formatCurrency(balance("emergency_fund"))} />
                 <SummaryCard label="Account acquisition" value={formatCurrency(totalAccountPurchaseCost)} tone="loss" />
-                <SummaryCard label="Operating expenses" value={formatCurrency(totalExpenses)} tone={totalExpenses > 0 ? "loss" : "neutral"} />
+                <SummaryCard label="Operating expenses" value={formatCurrency(operatingExpenses)} tone={operatingExpenses > 0 ? "loss" : "neutral"} />
                 <SummaryCard label="Net cash flow" value={formatCurrency(netCashFlow, { showSign: true })} tone={netCashFlow >= 0 ? "profit" : "loss"} hint="Income less expenses and reserve allocations" />
               </div>
 
