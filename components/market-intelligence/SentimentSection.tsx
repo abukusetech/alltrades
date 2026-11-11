@@ -138,7 +138,7 @@ export function SentimentSection() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Activity className="h-4 w-4 text-brand-600" />
-            <CardTitle>Gold Fear & Greed</CardTitle>
+            <CardTitle>Crypto Fear & Greed</CardTitle>
           </div>
           <div className="flex items-center gap-2">
             <select
@@ -188,7 +188,7 @@ export function SentimentSection() {
           ) : (
             <div className="text-2xs text-ink-500">Not available</div>
           )}
-          <p className="text-3xs text-ink-400">Source: alternative.me · Daily update</p>
+          <p className="text-3xs text-ink-400">Source: alternative.me · Crypto sentiment index · Daily update</p>
         </CardBody>
       </Card>
     </div>
