@@ -44,7 +44,7 @@ export function WithdrawalFormModal({
 
   const [date, setDate] = React.useState(toDateKey(new Date()));
   const [amount, setAmount] = React.useState("");       // personal
-  const [propFirm, setPropFirm] = React.useState("Maven");
+  const [propFirm, setPropFirm] = React.useState(account.broker || account.maven_rules?.program_label || account.maven_rules?.program || "Prop firm");
   const [accountSize, setAccountSize] = React.useState(""); // optional
   const [gross, setGross] = React.useState("");          // maven
   const [traderShare, setTraderShare] = React.useState("80");
@@ -58,7 +58,7 @@ export function WithdrawalFormModal({
     if (!open) return;
     setDate(toDateKey(new Date()));
     setAmount("");
-    setPropFirm(isPersonal ? "Personal" : "Maven");
+    setPropFirm(isPersonal ? "Personal" : account.broker || account.maven_rules?.program_label || account.maven_rules?.program || "Prop firm");
     setAccountSize(
       account.starting_capital
         ? String(Math.round(Number(account.starting_capital)))
@@ -151,12 +151,12 @@ export function WithdrawalFormModal({
         payload.firm_share_percent = preview.firmPercent;
         payload.expected_net_payout = preview.net;
         payload.fee_amount = f;
-        payload.prop_firm = propFirm.trim() || "Maven";
+        payload.prop_firm = propFirm.trim() || account.broker || account.maven_rules?.program_label || account.maven_rules?.program || "Prop firm";
       }
 
       await createWithdrawal(supabase, user.id, payload as never);
       toast.success(
-        isPersonal ? "Personal withdrawal recorded" : "Maven payout recorded"
+        isPersonal ? "Personal withdrawal recorded" : "Funded payout recorded"
       );
       onSaved();
       onClose();
@@ -174,7 +174,7 @@ export function WithdrawalFormModal({
       open={open}
       onClose={onClose}
       title={
-        isPersonal ? "Record Personal Withdrawal" : "Record Maven Payout"
+        isPersonal ? "Record Personal Withdrawal" : "Record Funded Payout"
       }
       description={
         isPersonal
