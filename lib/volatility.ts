@@ -76,7 +76,11 @@ export function classifyVolatility(
     : null;
   const currentPrice = candles[candles.length - 1].close;
 
-  if (currentATR === null || historicalATR === null || currentPrice <= 0) {
+  if (
+    currentATR === null || historicalATR === null ||
+    !Number.isFinite(currentATR) || !Number.isFinite(historicalATR) || historicalATR <= 0 ||
+    !Number.isFinite(currentPrice) || currentPrice <= 0
+  ) {
     return {
       atr: null,
       atrPercent: null,
