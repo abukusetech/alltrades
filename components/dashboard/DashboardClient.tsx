@@ -147,7 +147,16 @@ export function DashboardClient() {
             />
           )}
 
-          <section className="space-y-3">\n            <div className="flex items-center justify-between gap-3 px-0.5">\n              <div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">Performance</p><h2 className="mt-0.5 text-sm font-semibold text-ink-900">Account overview</h2></div>\n              <span className="text-[10px] text-ink-400">Live account data</span>\n            </div>\n            <TypeAwareMetrics mode={filterMode} grouped={grouped} />\n          </section>
+          <section className="space-y-3">
+            <div className="flex items-center justify-between gap-3 px-0.5">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">Performance</p>
+                <h2 className="mt-0.5 text-sm font-semibold tracking-tight text-ink-900">Account overview</h2>
+              </div>
+              <span className="rounded-full border border-border bg-white px-2.5 py-1 text-[10px] font-medium text-ink-500 shadow-sm">Live account data</span>
+            </div>
+            <TypeAwareMetrics mode={filterMode} grouped={grouped} />
+          </section>
           <WeeklyLockBanner />
 
           {!isAll && primaryAccount && (
