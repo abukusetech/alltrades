@@ -663,7 +663,7 @@ export function DailyAnalysisClient() {
             <Button variant="outline" size="sm" onClick={goToday}>
               Today
             </Button>
-            <Link href={`/trade-check?analysis=${analysis.id}`}>
+            <Link href={`/trade-check?analysis=${analysis.id}&instrument=${activeInstrument}`}>
               <Button variant="outline" size="sm">Open Trade Check</Button>
             </Link>
             <Link href="/journal">
