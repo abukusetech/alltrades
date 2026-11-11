@@ -36,7 +36,7 @@ const KIND_LABELS: Record<string, string> = {
   income: "Income",
   savings_deposit: "Savings deposit",
   refund: "Refund",
-  correction: "Correction",
+  correction: "Correction",\n  owner_contribution: "Owner funding",
 };
 
 const KIND_TONE: Record<string, "profit" | "loss" | "neutral" | "warn" | "brand"> = {
@@ -68,7 +68,7 @@ export function TransactionLedger({
   const [kindFilter, setKindFilter] = React.useState("All kinds");
   const [sortKey, setSortKey] = React.useState<SortKey>("occurred_on");
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("desc");
-  const [showReversed, setShowReversed] = React.useState(true);
+  const [showReversed, setShowReversed] = React.useState(false);
 
   const kindOptions = React.useMemo(() => {
     const set = new Set(transactions.map((t) => t.kind));
