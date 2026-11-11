@@ -670,6 +670,8 @@ export interface AccountingTransaction {
   id: string;
   user_id: string;
   occurred_on: string;
+  /** Optional originating trading account for provider/account-level reporting. */
+  account_id?: string | null;
   kind: AccountingTransactionKind;
   description: string;
   amount: number;
