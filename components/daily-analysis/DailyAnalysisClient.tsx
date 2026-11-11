@@ -133,10 +133,11 @@ export function DailyAnalysisClient() {
 
   const searchParams = useSearchParams();
   const initialDate = searchParams.get("date");
+  const initialInstrument = searchParams.get("instrument");
   const [date, setDate] = React.useState(() => initialDate ?? toDateKey(new Date()));
 
   // Instrument — separate analyses per instrument
-  const [activeInstrument, setActiveInstrument] = React.useState<string>("EURUSD");
+  const [activeInstrument, setActiveInstrument] = React.useState<string>(() => initialInstrument === "XAUUSD" ? "XAUUSD" : "EURUSD");
   // Tabs
   const [activeTab, setActiveTab] = React.useState<AnalysisTabKey>("context");
 
