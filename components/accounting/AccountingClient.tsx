@@ -355,12 +355,12 @@ export function AccountingClient() {
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <SummaryCard label="Withdrawals received" value={formatCurrency(totalWithdrawals)} hint={`${period.from} → ${period.to}`} tone={totalWithdrawals > 0 ? "profit" : "neutral"} />
-                <SummaryCard label="Business cash" value={formatCurrency(balance("business_cash"))} tone={balance("business_cash") < 0 ? "loss" : "neutral"} />
-                <SummaryCard label="Account fund" value={formatCurrency(balance("account_fund"))} hint="Reserved for future accounts" tone="brand" />
+                <SummaryCard label="Operating cash" value={formatCurrency(balance("business_cash"))} tone={balance("business_cash") < 0 ? "loss" : "neutral"} />
+                <SummaryCard label="Account growth reserve" value={formatCurrency(balance("account_fund"))} hint="Reserved for future accounts" tone="brand" />
                 <SummaryCard label="Personal savings" value={formatCurrency(balance("personal_savings"))} tone={balance("personal_savings") > 0 ? "profit" : "neutral"} />
                 <SummaryCard label="Emergency reserve" value={formatCurrency(balance("emergency_fund"))} />
-                <SummaryCard label="Account purchases" value={formatCurrency(totalAccountPurchaseCost)} tone="loss" />
-                <SummaryCard label="Expenses" value={formatCurrency(totalExpenses)} tone={totalExpenses > 0 ? "loss" : "neutral"} />
+                <SummaryCard label="Account acquisition" value={formatCurrency(totalAccountPurchaseCost)} tone="loss" />
+                <SummaryCard label="Operating expenses" value={formatCurrency(totalExpenses)} tone={totalExpenses > 0 ? "loss" : "neutral"} />
                 <SummaryCard label="Net cash flow" value={formatCurrency(netCashFlow, { showSign: true })} tone={netCashFlow >= 0 ? "profit" : "loss"} hint="Income less expenses and reserve allocations" />
               </div>
 
