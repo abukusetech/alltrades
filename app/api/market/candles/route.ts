@@ -37,13 +37,21 @@ export async function GET(request: Request) {
     const data = await res.json();
 
     if (data.status === "error") {
+      if (cached) {
+        return NextResponse.json({ ...cached.data, stale: true, warning: `TwelveData refresh failed: ${data.message}` });
+      }
       return NextResponse.json(
         { error: `TwelveData Error: ${data.message}` },
-        { status: 400 }
+        { status: 502 }
       );
     }
 
-    const response = { values: data.values || [] };
+    if (!Array.isArray(data.values) || data.values.length === 0) {
+      if (cached) return NextResponse.json({ ...cached.data, stale: true, warning: "Provider returned no candles; showing last cached data." });
+      return NextResponse.json({ error: "TwelveData returned no candle values for this symbol and timeframe." }, { status: 502 });
+    }
+
+    const response = { values: data.values, stale: false };
     cache.set(cacheKey, { data: response, timestamp: Date.now() });
 
     return NextResponse.json(response);
