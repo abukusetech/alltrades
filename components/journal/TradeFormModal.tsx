@@ -180,7 +180,7 @@ function prefillFromAnalysis(form: FormState, analysis: DailyAnalysis): FormStat
     next.risk_amount = String(analysis.planned_risk_amount);
   }
   if (!next.risk_reward && analysis.planned_rr !== null) {
-    next.risk_reward = `1 : ${analysis.planned_rr.toFixed(0)}`;
+    next.risk_reward = `1 : ${analysis.planned_rr.toFixed(2)}`;
   }
   if (!next.strategy && analysis.setup_tags && analysis.setup_tags.length > 0) {
     next.strategy = analysis.setup_tags[0];
