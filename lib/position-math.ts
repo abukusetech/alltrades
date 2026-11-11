@@ -65,13 +65,15 @@ function readXauusdSpecs(account: Account | null): XauusdSpecs | null {
   if (!Number.isFinite(cs) || cs <= 0) return null;
   if (!Number.isFinite(ts) || ts <= 0) return null;
   if (!Number.isFinite(tv) || tv <= 0) return null;
+  if (!Number.isFinite(ml) || ml <= 0) return null;
+  if (!Number.isFinite(ls) || ls <= 0) return null;
   return {
     contract_size: cs,
     tick_size: ts,
     tick_value_usd: tv,
     digits: Number.isFinite(dg) && dg > 0 ? dg : 2,
-    min_lot: Number.isFinite(ml) && ml > 0 ? ml : 0.01,
-    lot_step: Number.isFinite(ls) && ls > 0 ? ls : 0.01,
+    min_lot: ml,
+    lot_step: ls,
   };
 }
 
