@@ -856,7 +856,15 @@ export type AccountStatus =
  * is a first-class answer.
  */
 export interface MavenRules {
-  program?: "Instant Funding" | "Evaluation" | "Express" | "Other";
+  /** Legacy storage shape for provider-agnostic prop firm rules. */
+  program?: string | null;
+  program_label?: string | null;
+  evaluation_steps?: number | null;
+  phase?: string | null;
+  profit_target_percent?: number | null;
+  phase_two_profit_target_percent?: number | null;
+  min_payout_profit_percent?: number | null;
+  firm_profit_share_percent?: number | null;
   daily_loss_percent?: number | null;
   max_drawdown_percent?: number | null;
   drawdown_method?: "trailing" | "static" | "balance_based" | "equity_based" | null;

@@ -12,7 +12,8 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import { useCurrentAccount } from "@/components/layout/AppShell";
 import type { Account } from "@/lib/types";
-import { formatCurrency, formatPercent } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
+import { accountTypeLabel, accountTypeTone } from "@/lib/accounts/rules";
 
 export interface AccountListProps {
   accounts: Account[];
@@ -77,17 +78,10 @@ export function AccountList({ accounts }: AccountListProps) {
                       <Badge tone="neutral">Inactive</Badge>
                     )}
                   </div>
-                  <div className="mt-1 text-3xs text-ink-500">
-                    Starting{" "}
-                    <span className="tabular text-ink-700">
-                      {formatCurrency(Number(a.starting_capital))}
-                    </span>
-                    {" · "}
-                    {a.max_weekly_trades}/wk
-                    {" · "}
-                    {formatPercent(Number(a.withdrawal_target_percent), 0)} target
-                    {" · "}
-                    ≤ {formatPercent(Number(a.max_consistency_percent), 0)} consistency
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-3xs text-ink-500">
+                    <Badge tone={accountTypeTone(a.account_type)}>{accountTypeLabel(a.account_type)}</Badge>
+                    {(a.funding_source || a.broker) && <span>{a.funding_source || a.broker}</span>}
+                    <span>Starting <span className="tabular text-ink-700">{formatCurrency(Number(a.starting_capital))}</span></span>
                   </div>
                   {a.notes && (
                     <p className="mt-1.5 text-2xs text-ink-600">{a.notes}</p>

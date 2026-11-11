@@ -54,7 +54,7 @@ export function WithdrawalFormModal({
   const [date, setDate] = React.useState(toDateKey(new Date()));
   const [amount, setAmount] = React.useState("");          // personal
   const [propFirm, setPropFirm] = React.useState(
-    settings?.default_prop_firm ?? "Maven"
+    settings?.default_prop_firm ?? account?.funding_source ?? ""
   );
   const [accountSize, setAccountSize] = React.useState("");
   const [eligible, setEligible] = React.useState("");
@@ -94,7 +94,7 @@ export function WithdrawalFormModal({
     } else {
       setDate(toDateKey(new Date()));
       setAmount("");
-      setPropFirm(isPersonal ? "Personal" : settings?.default_prop_firm ?? "Maven");
+      setPropFirm(isPersonal ? "Personal" : settings?.default_prop_firm ?? account?.funding_source ?? "");
       setAccountSize(
         account?.starting_capital
           ? String(Math.round(Number(account.starting_capital)))
@@ -109,7 +109,7 @@ export function WithdrawalFormModal({
     }
   }, [open, editing, isPersonal, settings, account?.starting_capital]);
 
-  // Live preview for Maven
+  // Live payout split preview for prop firm accounts
   const preview = React.useMemo(() => {
     const g = parseNumberOrNull(gross) ?? 0;
     const t = parseNumberOrNull(traderShare) ?? 0;
@@ -162,7 +162,7 @@ export function WithdrawalFormModal({
       }
 
       if (isPersonal) {
-        // Personal withdrawals don't have a split. They just record the amount.
+        // Personal withdrawals do not have a provider profit split. They record the amount taken from personal trading capital.
         const amt = parseNumberOrNull(amount) as number;
 
         if (editing) {
@@ -203,13 +203,13 @@ export function WithdrawalFormModal({
           } as never);
 
           // Ledger entries are posted by the allocation step, not here.
-          // This mirrors the Maven flow: record the withdrawal, mark it paid,
+          // Record the personal withdrawal and mark it paid,
           // then let the user allocate it (or leave it unallocated).
         }
 
         toast.success("Personal withdrawal recorded");
       } else {
-        // Maven payout flow
+        // Prop firm payout flow
         const g = parseNumberOrNull(gross) as number;
         const t = parseNumberOrNull(traderShare) as number;
         const f = parseNumberOrNull(fee) ?? 0;
@@ -225,13 +225,13 @@ export function WithdrawalFormModal({
             fee_amount: f,
             reference: reference.trim() || null,
             notes: notes.trim() || null,
-            prop_firm: propFirm.trim() || "Maven",
+            prop_firm: propFirm.trim() || "Prop Firm",
             account_size: parseNumberOrNull(accountSize),
             account_id: account.id,
           } as never);
         } else {
           const created = await createWithdrawalRecord(supabase, user.id, {
-            prop_firm: propFirm.trim() || "Maven",
+            prop_firm: propFirm.trim() || "Prop Firm",
             account_size: parseNumberOrNull(accountSize),
             request_date: date,
             gross_profit_eligible: parseNumberOrNull(eligible),
@@ -249,7 +249,7 @@ export function WithdrawalFormModal({
           } as never);
         }
 
-        toast.success("Maven payout recorded");
+        toast.success("Prop firm payout recorded");
       }
 
       onSaved();
@@ -266,14 +266,14 @@ export function WithdrawalFormModal({
   const title = editing
     ? isPersonal
       ? "Edit Personal Withdrawal"
-      : "Edit Maven Payout"
+      : "Edit Prop Firm Payout"
     : isPersonal
       ? "Record Personal Withdrawal"
-      : "Record Maven Payout";
+      : "Record Prop Firm Payout";
 
   const description = isPersonal
     ? `Cash you took out of ${account?.name ?? "your personal account"}. No profit split, no firm cut.`
-    : `Track a Maven payout from ${account?.name ?? "your account"} through payment.`;
+    : `Track a payout from ${account?.name ?? "your prop firm account"} through approval and payment.`;
 
   return (
     <Modal
@@ -353,18 +353,17 @@ export function WithdrawalFormModal({
             </Field>
 
             <div className="rounded border border-border bg-surface-soft px-3 py-2 text-3xs text-ink-500">
-              Personal withdrawals do not go through Maven's profit split,
-              consistency rule, or payout eligibility. The amount reduces your
-              personal account capital by exactly what you withdraw.
+              Personal withdrawals are separate from prop firm payout splits.
+              Record the amount actually taken from your personal trading capital.
             </div>
           </>
         )}
 
-        {/* ---- Maven form ---- */}
+        {/* ---- Prop firm payout form ---- */}
         {!isPersonal && (
           <>
             <div className="rounded border border-brand-200 bg-brand-50 px-3 py-2 text-2xs text-brand-800">
-              <strong>Maven Prop Firm</strong> — {account?.name ?? "—"}
+              <strong>Prop Firm Account</strong> — {account?.name ?? "—"}
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -445,7 +444,7 @@ export function WithdrawalFormModal({
                   suffix="%"
                 />
               </Field>
-              <Field label="Firm share %" htmlFor="wd_firm" hint="Auto">
+              <Field label="Provider share %" htmlFor="wd_firm" hint="Auto">
                 <Input
                   id="wd_firm"
                   value={preview.firmPercent.toFixed(2)}
