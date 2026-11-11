@@ -175,39 +175,83 @@ export function computeGate(input: GateInput): GateResult {
     severity: "mandatory",
   });
 
-  // ---- 11. Four confirmations explicitly checked
-  const conf = analysis?.setup_confirmation ?? DEFAULT_CONFIRMATION;
-  const confKeys = [
-    ["market_structure_supports", "Market structure supports direction"],
-    ["liquidity_met", "Liquidity condition met"],
+  // ---- 11. Read the current confirmation model, with legacy fallback
+  const decision = analysis?.daily_decision ?? null;
+  const newConfirmationKeys = [
+    ["htf_alignment", "Higher-timeframe alignment"],
+    ["structure_confirmed", "Market structure confirmed"],
+    ["direction_confirmed", "Direction confirmed"],
+    ["liquidity_taken", "Liquidity taken"],
     ["entry_zone_reached", "Entry zone reached"],
+    ["displacement_present", "Displacement present"],
     ["confirmation_candle", "Confirmation candle formed"],
+    ["no_news_exposure", "No prohibited high-impact news exposure"],
+    ["sl_defined", "Stop loss defined"],
+    ["tp_defined", "Take profit defined"],
+    ["rr_meets_minimum", "Reward-to-risk meets minimum"],
+    ["risk_within_limits", "Risk within account limits"],
   ] as const;
-  for (const [k, label] of confKeys) {
-    const checked = Boolean(conf[k]);
-    checks.push({
-      key: `confirm_${k}`,
-      label,
-      status: checked ? "PASS" : "NOT_CONFIRMED",
-      reason: checked ? null : "Not confirmed by trader",
-      severity: "mandatory",
-    });
+  const newStates = (analysis?.confirmation_states ?? {}) as Record<string, string | undefined>;
+  const hasNewConfirmationModel = Object.keys(newStates).length > 0;
+  const newConfirmationsReady = hasNewConfirmationModel &&
+    newConfirmationKeys.every(([key]) => newStates[key] === "YES");
+
+  if (hasNewConfirmationModel) {
+    for (const [key, label] of newConfirmationKeys) {
+      const state = newStates[key];
+      checks.push({
+        key: `confirm_${key}`,
+        label,
+        status: state === "YES" ? "PASS" : state === "NO" ? "FAIL" : "NOT_CONFIRMED",
+        reason: state === "YES" ? null : state === "NO" ? "Marked as not satisfied" : "Not explicitly confirmed",
+        severity: "mandatory",
+      });
+    }
+  } else {
+    const legacy = analysis?.setup_confirmation ?? DEFAULT_CONFIRMATION;
+    const legacyKeys = [
+      ["market_structure_supports", "Market structure supports direction"],
+      ["liquidity_met", "Liquidity condition met"],
+      ["entry_zone_reached", "Entry zone reached"],
+      ["confirmation_candle", "Confirmation candle formed"],
+    ] as const;
+    for (const [key, label] of legacyKeys) {
+      const checked = Boolean(legacy[key]);
+      checks.push({
+        key: `confirm_${key}`,
+        label,
+        status: checked ? "PASS" : "NOT_CONFIRMED",
+        reason: checked ? null : "Not confirmed by trader",
+        severity: "mandatory",
+      });
+    }
   }
 
-  // ---- 12. Decision = CONFIRMED (not Waiting / No Trade)
-  const decision = analysis?.daily_decision ?? null;
+  // Account-specific news restrictions are authoritative.
+  const newsBlocked = account?.forbid_high_impact_news === true && analysis?.news_major === true;
+  checks.push({
+    key: "news_restriction",
+    label: "Account news restriction respected",
+    status: newsBlocked ? "FAIL" : "PASS",
+    reason: newsBlocked ? "This account prohibits trading during the marked high-impact news event" : null,
+    severity: "mandatory",
+  });
+
+  // The redesigned analysis stores READY in final_decision; older records use status/daily_decision.
+  const legacyConfirmationsReady = !hasNewConfirmationModel &&
+    Object.values(analysis?.setup_confirmation ?? {}).length > 0 &&
+    Object.values(analysis?.setup_confirmation ?? {}).every(Boolean);
+  const decisionConfirmed =
+    analysis?.final_decision === "READY" ||
+    analysis?.status === "SETUP_CONFIRMED" ||
+    decision === "CONFIRMED" ||
+    newConfirmationsReady ||
+    legacyConfirmationsReady;
   checks.push({
     key: "decision_confirmed",
-    label: "Daily decision set to Setup Confirmed",
-    status: decision === "CONFIRMED" ? "PASS" : "FAIL",
-    reason:
-      decision === "CONFIRMED"
-        ? null
-        : decision === "NO_TRADE"
-          ? "Decision is No Trade"
-          : decision === "WAITING"
-            ? "Decision is Waiting for confirmation"
-            : "Daily decision not set",
+    label: "Daily analysis is confirmed and ready",
+    status: decisionConfirmed ? "PASS" : "FAIL",
+    reason: decisionConfirmed ? null : "Complete the confirmation checklist and resolve the analysis decision",
     severity: "mandatory",
   });
 
