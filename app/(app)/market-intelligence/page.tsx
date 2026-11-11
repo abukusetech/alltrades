@@ -59,7 +59,7 @@ export default function MarketIntelligencePage() {
         <CardBody>
           <p className="text-2xs leading-relaxed text-ink-600">
             Volatility classifications use ATR (Average True Range, 14-period) compared
-            against the historical average ATR for the same instrument and timeframe.
+            against the average of the previous 20 ATR readings for the same instrument and timeframe.
             A classification of NORMAL means volatility is within its typical range —
             it does not mean the market is safe. This is an informational tool, not a
             trading signal. Trade Check and your weekly loss limit remain the
