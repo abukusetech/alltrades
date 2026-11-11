@@ -36,7 +36,8 @@ const KIND_LABELS: Record<string, string> = {
   income: "Income",
   savings_deposit: "Savings deposit",
   refund: "Refund",
-  correction: "Correction",\n  owner_contribution: "Owner funding",
+  correction: "Correction",
+  owner_contribution: "Owner funding",
 };
 
 const KIND_TONE: Record<string, "profit" | "loss" | "neutral" | "warn" | "brand"> = {
