@@ -147,6 +147,13 @@ export function DashboardClient() {
             />
           )}
 
+          <nav aria-label="Trading workspace" className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-white/90 p-3 shadow-[0_4px_18px_-14px_rgba(15,23,42,0.35)]">
+            <span className="mr-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-400">Workspace</span>
+            <Link href="/daily-analysis" className="rounded-lg border border-border bg-surface-soft px-3 py-2 text-xs font-medium text-ink-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700">Daily Analysis</Link>
+            <Link href="/trade-check" className="rounded-lg border border-border bg-surface-soft px-3 py-2 text-xs font-medium text-ink-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700">Trade Check</Link>
+            <Link href="/market-intelligence" className="rounded-lg border border-border bg-surface-soft px-3 py-2 text-xs font-medium text-ink-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700">Market Intelligence</Link>
+          </nav>
+
           <section className="space-y-3">
             <div className="flex items-center justify-between gap-3 px-0.5">
               <div>
