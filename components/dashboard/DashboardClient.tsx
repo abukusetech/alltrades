@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ClipboardCheck, Plus } from "lucide-react";
+import { ClipboardCheck } from "lucide-react";
 import { useCurrentAccount } from "@/components/layout/AppShell";
 import {
   useTradesForFilter,
