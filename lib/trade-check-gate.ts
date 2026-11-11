@@ -159,7 +159,9 @@ export function computeGate(input: GateInput): GateResult {
 
   // ---- 10. Risk within personal limit (max 1% for safety unless configured)
   const riskPct = analysis?.planned_risk_percent ?? 0;
-  const maxRiskPct = account?.personal_risk_percent ?? 1.0;
+  const maxRiskPct = account?.account_type === "MAVEN"
+    ? account.maven_rules?.max_risk_per_trade_percent ?? account.personal_risk_percent ?? 1.0
+    : account?.personal_risk_percent ?? 1.0;
   const riskOk = riskPct > 0 && riskPct <= maxRiskPct + 0.0001;
   checks.push({
     key: "risk_limit",
