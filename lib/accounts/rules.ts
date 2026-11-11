@@ -1,8 +1,8 @@
-﻿// ALLTRADES — Account rule resolvers
+// ALLTRADES — Account rule resolvers
 //
-// One source of truth for "what are this account's rules?"
-// Maven accounts read from maven_rules (JSONB). Personal accounts
-// read from personal_* columns. They NEVER read from each other.
+// Prop firm accounts read their provider-specific rules from the legacy
+// maven_rules JSONB column. The UI and user-facing language are provider
+// agnostic. Personal accounts read only from personal_* columns.
 
 import type {
   Account,
@@ -17,7 +17,7 @@ export interface ResolvedMavenRules {
   drawdownMethod: MavenRules["drawdown_method"];
   resetTimeUtc: string | null;
   maxRiskPerTradePercent: number | null;
-  consistencyRequired: boolean;
+  consistencyRequired: boolean | null;
   maxConsistencyPercent: number | null;
   minPayoutAmount: number | null;
   profitSplitPercent: number | null;
@@ -35,31 +35,24 @@ export interface ResolvedPersonalRules {
   notes: string | null;
 }
 
-/**
- * Merge account-level defaults into the Maven rules JSONB.
- * Never invent values — return null when unconfigured.
- */
+/** Resolve configured prop firm rules without inventing missing values. */
 export function getMavenRules(account: Account | null): ResolvedMavenRules {
-  const r = (account?.maven_rules ?? {}) as MavenRules;
-
-  // Fall back to the account-level columns only if the JSONB is empty.
-  // These columns were the original source pre-Phase 17.
+  const rules = (account?.maven_rules ?? {}) as MavenRules;
   const dailyLossPercent =
-    r.daily_loss_percent ??
+    rules.daily_loss_percent ??
     (Number(account?.max_daily_drawdown_percent ?? 0) || null);
   const maxDrawdownPercent =
-    r.max_drawdown_percent ??
+    rules.max_drawdown_percent ??
     (Number(account?.max_total_drawdown_percent ?? 0) || null);
   const maxConsistencyPercent =
-    r.max_consistency_percent ??
+    rules.max_consistency_percent ??
     (Number(account?.max_consistency_percent ?? 0) || null);
   const profitSplitPercent =
     (account as unknown as { profit_split_percent?: number } | null)
-      ?.profit_split_percent ?? r.profit_split_percent ?? null;
-  const maxWeeklyTrades =
-    r.max_weekly_trades ?? account?.max_weekly_trades ?? null;
+      ?.profit_split_percent ?? rules.profit_split_percent ?? null;
+  const maxWeeklyTrades = rules.max_weekly_trades ?? account?.max_weekly_trades ?? null;
   const maxMonthlyTrades =
-    r.max_monthly_trades ??
+    rules.max_monthly_trades ??
     (account as unknown as { max_trades_per_month?: number } | null)
       ?.max_trades_per_month ??
     null;
@@ -67,24 +60,22 @@ export function getMavenRules(account: Account | null): ResolvedMavenRules {
   return {
     dailyLossPercent,
     maxDrawdownPercent,
-    drawdownMethod: r.drawdown_method ?? "trailing",
-    resetTimeUtc: r.reset_time_utc ?? "00:00",
-    maxRiskPerTradePercent: r.max_risk_per_trade_percent ?? null,
-    consistencyRequired: r.consistency_required ?? true,
+    drawdownMethod: rules.drawdown_method ?? null,
+    resetTimeUtc: rules.reset_time_utc ?? null,
+    maxRiskPerTradePercent: rules.max_risk_per_trade_percent ?? null,
+    consistencyRequired: rules.consistency_required ?? null,
     maxConsistencyPercent,
-    minPayoutAmount: r.min_payout_amount ?? null,
+    minPayoutAmount: rules.min_payout_amount ?? null,
     profitSplitPercent,
-    minTradingDays: r.min_trading_days ?? null,
+    minTradingDays: rules.min_trading_days ?? null,
     maxWeeklyTrades,
     maxMonthlyTrades,
-    tradingRestrictions: r.trading_restrictions ?? null,
-    notes: r.notes ?? null,
+    tradingRestrictions: rules.trading_restrictions ?? null,
+    notes: rules.notes ?? null,
   };
 }
 
-/**
- * Personal rules — user's own preferences. Never inherits Maven rules.
- */
+/** Personal rules never inherit prop firm rules. */
 export function getPersonalRules(account: Account | null): ResolvedPersonalRules {
   return {
     riskPercentPerTrade: account?.personal_risk_percent ?? null,
@@ -94,30 +85,21 @@ export function getPersonalRules(account: Account | null): ResolvedPersonalRules
   };
 }
 
-/**
- * Return the currently-effective rules for an account, respecting
- * account_type. Never mix.
- */
 export function resolveRulesForAccount(account: Account | null): {
   type: AccountType;
   maven: ResolvedMavenRules | null;
   personal: ResolvedPersonalRules | null;
 } {
   const type = account?.account_type ?? "UNCLASSIFIED";
-  if (type === "MAVEN") {
-    return { type, maven: getMavenRules(account), personal: null };
-  }
-  if (type === "PERSONAL") {
-    return { type, maven: null, personal: getPersonalRules(account) };
-  }
+  if (type === "MAVEN") return { type, maven: getMavenRules(account), personal: null };
+  if (type === "PERSONAL") return { type, maven: null, personal: getPersonalRules(account) };
   return { type: "UNCLASSIFIED", maven: null, personal: null };
 }
 
-/** Human-readable label for a given account type. */
 export function accountTypeLabel(type: AccountType): string {
   switch (type) {
     case "MAVEN":
-      return "Maven Prop Firm";
+      return "Prop Firm";
     case "PERSONAL":
       return "Personal Capital";
     default:
@@ -125,10 +107,7 @@ export function accountTypeLabel(type: AccountType): string {
   }
 }
 
-/** Small tone for badges. */
-export function accountTypeTone(
-  type: AccountType
-): "brand" | "profit" | "warn" | "neutral" {
+export function accountTypeTone(type: AccountType): "brand" | "profit" | "warn" | "neutral" {
   switch (type) {
     case "MAVEN":
       return "brand";
@@ -140,4 +119,3 @@ export function accountTypeTone(
       return "neutral";
   }
 }
-
