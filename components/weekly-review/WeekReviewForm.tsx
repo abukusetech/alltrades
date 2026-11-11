@@ -133,7 +133,7 @@ export function WeekReviewForm({
         </div>
       </CardHeader>
 
-      <CardBody className="space-y-4">
+      <CardBody className="space-y-5">
         <Field label="What went well?" htmlFor="went_well">
           <Textarea
             id="went_well"
@@ -190,7 +190,8 @@ export function WeekReviewForm({
           </Field>
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-border pt-3">
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-soft/70 p-3">
+          <span className="text-3xs text-ink-500">{dirty ? "Your edits are not saved yet." : "Your review is saved to this account and week."}</span>
           <Button onClick={onSave} loading={saving} disabled={loading}>
             {dirty ? "Save review" : "Save"}
           </Button>
