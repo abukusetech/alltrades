@@ -45,7 +45,7 @@ export function ResultsDonut({ metrics }: ResultsDonutProps) {
             No trade results yet.
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-4 sm:flex-row">
+          <div className="flex flex-col items-center gap-5 rounded-lg bg-surface-soft/50 p-3 sm:flex-row">
             <div className="h-52 w-52 shrink-0">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -96,7 +96,7 @@ export function ResultsDonut({ metrics }: ResultsDonutProps) {
                 return (
                   <div
                     key={d.key}
-                    className="flex items-center justify-between gap-3"
+                    className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 hover:bg-white"
                   >
                     <div className="flex items-center gap-2">
                       <span className={cn("h-3 w-3 rounded-sm", color)} />
