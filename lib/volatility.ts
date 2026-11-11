@@ -54,13 +54,13 @@ export function classifyVolatility(
   candles: Candle[],
   instrument: string
 ): VolatilityResult {
-  if (candles.length < 35) {
+  if (candles.length < 48) {
     return {
       atr: null,
       atrPercent: null,
       relativeToAverage: null,
       classification: "UNAVAILABLE",
-      reason: "Insufficient candle data (need at least 35 candles for ATR and historical comparison)",
+      reason: "Insufficient candle data (need at least 48 candles for ATR and 20 historical readings)",
     };
   }
 
