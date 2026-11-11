@@ -51,7 +51,7 @@ export function CashFlowByType({
         bucket.expenses += amount;
       }
       
-      // Include allocation in the count so Maven shows transactions
+      // Exclude internal transfers and allocations from external activity counts
       if (t.kind !== "allocation" && t.kind !== "transfer" && t.kind !== "owner_contribution") {
         bucket.count += 1;
       }
