@@ -31,7 +31,7 @@ export function WithdrawalProgress({
         <div>
           <CardTitle>Withdrawal target</CardTitle>
           <p className="mt-1 text-3xs text-ink-500">
-            {targetPercent.toFixed(2).replace(/\\.?0+$/, "")}% of starting capital
+            {(Number.isInteger(targetPercent) ? targetPercent.toFixed(0) : targetPercent.toFixed(2))}% of starting capital
           </p>
         </div>
         <Badge tone={targetReached ? "profit" : "neutral"}>
