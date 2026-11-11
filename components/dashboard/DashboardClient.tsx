@@ -99,26 +99,32 @@ export function DashboardClient() {
   const isPersonal = primaryAccount?.account_type === "PERSONAL";
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Dashboard"
-        subtitle={
-          isAll
-            ? "A consolidated view of your trading accounts, with each account type kept separate."
-            : isMaven
-              ? `${primaryAccount?.broker || primaryAccount?.maven_rules?.program_label || "Funded account"} performance, discipline and payout status.`
-              : isPersonal
-                ? "Personal Capital account performance and risk plan."
-                : "Funded account performance, discipline and withdrawal status."
-        }
-        actions={
-          <Link href="/journal">
-            <Button leftIcon={<Plus className="h-3.5 w-3.5" />}>
-              New Trade
-            </Button>
+    <div className="space-y-6 pb-4">
+      <div className="relative overflow-hidden rounded-2xl border border-ink-800/10 bg-gradient-to-br from-[#101b31] via-[#172943] to-[#203d5b] px-5 py-5 text-white shadow-[0_14px_38px_-24px_rgba(15,23,42,0.65)] sm:px-7 sm:py-6">
+        <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full border border-white/10" />
+        <div className="pointer-events-none absolute -right-2 -top-16 h-48 w-48 rounded-full border border-white/10" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-200/80">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" />
+              Trading overview
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-[28px]">Dashboard</h1>
+            <p className="mt-1.5 max-w-2xl text-xs leading-5 text-slate-300">
+              {isAll
+                ? "A consolidated view of your trading accounts, with each account type kept separate."
+                : isMaven
+                  ? `${primaryAccount?.broker || primaryAccount?.maven_rules?.program_label || "Funded account"} performance, discipline and payout status.`
+                  : isPersonal
+                    ? "Personal Capital account performance and risk plan."
+                    : "Funded account performance, discipline and withdrawal status."}
+            </p>
+          </div>
+          <Link href="/journal" className="relative shrink-0">
+            <Button leftIcon={<Plus className="h-3.5 w-3.5" />}>New Trade</Button>
           </Link>
-        }
-      />
+        </div>
+      </div>
 
       {filteredAccounts.length === 0 ? (
         <EmptyState
@@ -141,7 +147,7 @@ export function DashboardClient() {
             />
           )}
 
-          <TypeAwareMetrics mode={filterMode} grouped={grouped} />
+          <section className="space-y-3">\n            <div className="flex items-center justify-between gap-3 px-0.5">\n              <div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">Performance</p><h2 className="mt-0.5 text-sm font-semibold text-ink-900">Account overview</h2></div>\n              <span className="text-[10px] text-ink-400">Live account data</span>\n            </div>\n            <TypeAwareMetrics mode={filterMode} grouped={grouped} />\n          </section>
           <WeeklyLockBanner />
 
           {!isAll && primaryAccount && (
