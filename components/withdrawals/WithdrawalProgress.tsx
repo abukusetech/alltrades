@@ -19,6 +19,7 @@ export function WithdrawalProgress({
     targetReached,
   } = metrics;
 
+  const targetPercent = startingCapital > 0 ? (withdrawalTarget / startingCapital) * 100 : 0;
   const progressPct =
     withdrawalTarget > 0
       ? Math.min(100, (profitTowardTarget / withdrawalTarget) * 100)
@@ -28,9 +29,9 @@ export function WithdrawalProgress({
     <Card>
       <CardHeader>
         <div>
-          <CardTitle>Withdrawal Target</CardTitle>
+          <CardTitle>Withdrawal target</CardTitle>
           <p className="mt-1 text-3xs text-ink-500">
-            4% of starting capital
+            {targetPercent.toFixed(2).replace(/\\.?0+$/, "")}% of starting capital
           </p>
         </div>
         <Badge tone={targetReached ? "profit" : "neutral"}>
@@ -40,8 +41,8 @@ export function WithdrawalProgress({
 
       <CardBody className="space-y-5">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Metric label="Starting Capital" value={formatCurrency(startingCapital)} />
-          <Metric label="4% Target" value={formatCurrency(withdrawalTarget)} />
+          <Metric label="Starting capital" value={formatCurrency(startingCapital)} />
+          <Metric label="Configured target" value={formatCurrency(withdrawalTarget)} />
           <Metric
             label="Profit Toward Target"
             value={formatCurrency(profitTowardTarget)}
