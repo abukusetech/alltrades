@@ -213,9 +213,9 @@ export function CalendarClient() {
               </div>
 
               {/* Calendar grid */}
-              <div className="overflow-hidden rounded-lg border border-border bg-white shadow-card">
+              <div className="overflow-x-auto rounded-lg border border-border bg-white shadow-card">
                 {/* Weekday header */}
-                <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_110px] border-b border-border bg-surface-muted">
+                <div className="grid min-w-[760px] grid-cols-[repeat(7,minmax(0,1fr))_110px] border-b border-border bg-surface-muted">
                   {WEEKDAY_LABELS.map((d) => (
                     <div
                       key={d}
@@ -232,7 +232,7 @@ export function CalendarClient() {
                 {weeks.map((w, wi) => (
                   <div
                     key={wi}
-                    className="grid grid-cols-[repeat(7,minmax(0,1fr))_110px] border-b border-border last:border-b-0"
+                    className="grid min-w-[760px] grid-cols-[repeat(7,minmax(0,1fr))_110px] border-b border-border last:border-b-0"
                   >
                     {w.cells.map((c) => {
                       const isToday = c.key === todayKey;
