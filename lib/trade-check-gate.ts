@@ -194,7 +194,10 @@ export function computeGate(input: GateInput): GateResult {
   const newStates = (analysis?.confirmation_states ?? {}) as Record<string, string | undefined>;
   const hasNewConfirmationModel = Object.keys(newStates).length > 0;
   const newConfirmationsReady = hasNewConfirmationModel &&
-    newConfirmationKeys.every(([key]) => newStates[key] === "YES");
+    newConfirmationKeys.every(([key]) =>
+      newStates[key] === "YES" ||
+      (key === "no_news_exposure" && newStates[key] === "NA" && account?.forbid_high_impact_news !== true)
+    );
 
   if (hasNewConfirmationModel) {
     for (const [key, label] of newConfirmationKeys) {
@@ -259,8 +262,8 @@ export function computeGate(input: GateInput): GateResult {
   checks.push({
     key: "no_trade_today",
     label: "No trade already taken today",
-    status: input.hasTradeToday ? "FAIL" : "PASS",
-    reason: input.hasTradeToday ? "A trade is already recorded for today" : null,
+    status: input.hasTradeToday || analysis?.status === "TRADE_TAKEN" ? "FAIL" : "PASS",
+    reason: input.hasTradeToday || analysis?.status === "TRADE_TAKEN" ? "A trade is already recorded for today" : null,
     severity: "mandatory",
   });
 
