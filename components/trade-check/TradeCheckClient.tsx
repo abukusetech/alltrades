@@ -65,7 +65,7 @@ export function TradeCheckClient() {
       stopLoss: analysis.planned_stop_loss,
       takeProfit: analysis.planned_take_profit,
       riskPercent: analysis.planned_risk_percent ?? 0,
-      balance: metrics.currentCapital,
+      balance: metrics.currentCapital > 0 ? metrics.currentCapital : Number(currentAccount?.starting_capital ?? 0),
       account: currentAccount,
     });
   }, [analysis, metrics.currentCapital, currentAccount]);
@@ -104,6 +104,9 @@ export function TradeCheckClient() {
         <Link href="/journal">
           <Button variant="outline" size="sm">Open Journal</Button>
         </Link>
+        <Link href={`/position-calculator?instrument=${instrument}`}>
+          <Button variant="outline" size="sm">Position Calculator</Button>
+        </Link>
       </div>
 
       {isLoading ? (
@@ -114,7 +117,7 @@ export function TradeCheckClient() {
           title="No analysis saved for today"
           description="Complete the Daily Analysis before running the gate."
           action={
-            <Link href="/daily-analysis">
+            <Link href={`/daily-analysis?instrument=${instrument}`}>
               <Button>Open Daily Analysis</Button>
             </Link>
           }
