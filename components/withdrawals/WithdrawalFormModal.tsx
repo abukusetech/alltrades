@@ -42,12 +42,14 @@ export function WithdrawalFormModal({
 
   const isPersonal = kind === "PERSONAL";
 
+  const configuredTraderShare = account.maven_rules?.profit_split_percent;
+
   const [date, setDate] = React.useState(toDateKey(new Date()));
   const [amount, setAmount] = React.useState("");       // personal
   const [propFirm, setPropFirm] = React.useState(account.broker || account.maven_rules?.program_label || account.maven_rules?.program || "Prop firm");
   const [accountSize, setAccountSize] = React.useState(""); // optional
   const [gross, setGross] = React.useState("");          // maven
-  const [traderShare, setTraderShare] = React.useState("80");
+  const [traderShare, setTraderShare] = React.useState(configuredTraderShare == null ? "" : String(configuredTraderShare));
   const [fee, setFee] = React.useState("0");
   const [reference, setReference] = React.useState("");
   const [notes, setNotes] = React.useState("");
@@ -65,14 +67,14 @@ export function WithdrawalFormModal({
         : ""
     );
     setGross("");
-    setTraderShare("80");
+    setTraderShare(configuredTraderShare == null ? "" : String(configuredTraderShare));
     setFee("0");
     setReference("");
     setNotes("");
     setErrors({});
   }, [open, isPersonal, account.starting_capital]);
 
-  // Live preview for Maven
+  // Live preview for funded-account payouts
   const preview = React.useMemo(() => {
     const g = parseNumberOrNull(gross) ?? 0;
     const t = parseNumberOrNull(traderShare) ?? 0;
@@ -253,18 +255,18 @@ export function WithdrawalFormModal({
             </Field>
 
             <div className="rounded border border-border bg-surface-soft px-3 py-2 text-3xs text-ink-500">
-              Personal withdrawals do not go through Maven's profit split,
+              Personal withdrawals do not go through a firm's profit split,
               consistency rule, or payout eligibility. The amount reduces your
               account capital by exactly what you withdraw.
             </div>
           </>
         )}
 
-        {/* ---- Maven form ---- */}
+        {/* ---- Funded-account form ---- */}
         {!isPersonal && (
           <>
             <div className="rounded border border-brand-200 bg-brand-50 px-3 py-2 text-2xs text-brand-800">
-              <strong>Maven Prop Firm</strong> — {account.name}
+              <strong>{account.broker || account.maven_rules?.program_label || account.maven_rules?.program || "Funded account"}</strong> — {account.name}
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
