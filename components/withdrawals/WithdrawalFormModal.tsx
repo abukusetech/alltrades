@@ -72,7 +72,7 @@ export function WithdrawalFormModal({
     setReference("");
     setNotes("");
     setErrors({});
-  }, [open, isPersonal, account.starting_capital]);
+  }, [open, isPersonal, account.starting_capital, account.broker, account.maven_rules?.program_label, account.maven_rules?.program, configuredTraderShare]);
 
   // Live preview for funded-account payouts
   const preview = React.useMemo(() => {
