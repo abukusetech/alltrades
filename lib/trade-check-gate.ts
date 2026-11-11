@@ -215,7 +215,7 @@ export function computeGate(input: GateInput): GateResult {
     label: "No trade already taken today",
     status: input.hasTradeToday ? "FAIL" : "PASS",
     reason: input.hasTradeToday ? "A trade is already recorded for today" : null,
-    severity: "informational",
+    severity: "mandatory",
   });
 
   // ---- Compute gate status
@@ -228,6 +228,7 @@ export function computeGate(input: GateInput): GateResult {
 
   let status: GateStatus;
   if (!analysis) status = "ANALYSIS_INCOMPLETE";
+  else if (input.hasTradeToday) status = "TRADE_TAKEN";
   else if (decision === "NO_TRADE") status = "INVALIDATED";
   else if (failed.length > 0) status = "BLOCKED";
   else if (unconfirmed.length > 0) status = "WAITING_FOR_CONFIRMATION";
