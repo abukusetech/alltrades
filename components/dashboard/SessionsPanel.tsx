@@ -111,7 +111,7 @@ export function SessionsPanel() {
                     <div className="mt-3 rounded bg-surface-muted px-2 py-2 text-center">
                       <div className="text-3xs font-medium text-ink-500 uppercase tracking-wide">Status</div>
                       <div className="mt-0.5 text-xs font-bold text-ink-700">
-                        {market.isOpen ? "Closed" : !market.isOpen ? "Forex market closed" : nextWeek ? "After weekly market reopen" : `Starts in ${formatCountdown(status.untilOpenSecs)}`}
+                        {market.isOpen ? "Closed" : "Forex market closed"}
                       </div>
                     </div>
                   )}
@@ -150,7 +150,7 @@ export function SessionsPanel() {
                   <div className="mt-1 tabular text-xs font-semibold text-ink-700">
                     {market.isOpen && status.status === "ACTIVE"
                       ? `Ends in ${formatCountdown(status.remainingSecs)}`
-                      : "Market Closed"}
+                      : nextWeek ? "After weekly market reopen" : market.isOpen ? `Starts in ${formatCountdown(status.untilOpenSecs)}` : "Forex market closed"}
                   </div>
                 </div>
               );
