@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import { Calculator, AlertTriangle, CheckCircle2, Link2 } from "lucide-react";
 import { useCurrentAccount } from "@/components/layout/AppShell";
 import { useTrades, useWithdrawals } from "@/lib/data/hooks";
@@ -19,6 +20,7 @@ import { cn, formatCurrency, parseNumberOrNull, toDateKey } from "@/lib/utils";
 
 export function PositionCalculatorClient() {
   const { currentAccount, currentAccountId } = useCurrentAccount();
+  const searchParams = useSearchParams();
   const { data: trades = [] } = useTrades(currentAccountId);
   const { data: withdrawals = [] } = useWithdrawals(currentAccountId);
 
@@ -28,10 +30,11 @@ export function PositionCalculatorClient() {
   );
 
   const today = toDateKey(new Date());
-  const { data: analysis } = useDailyAnalysis(currentAccountId, today);
+  const analysisInstrument = overrideInstrument ?? "EURUSD";
+  const { data: analysis } = useDailyAnalysis(currentAccountId, today, analysisInstrument);
 
   const [overrideInstrument, setOverrideInstrument] =
-    React.useState<"EURUSD" | "XAUUSD" | null>(null);
+    React.useState<"EURUSD" | "XAUUSD" | null>(() => searchParams.get("instrument") === "XAUUSD" ? "XAUUSD" : null);
   const [overrideDirection, setOverrideDirection] =
     React.useState<"BUY" | "SELL" | null>(null);
   const [overrideEntry, setOverrideEntry] = React.useState<string>("");
