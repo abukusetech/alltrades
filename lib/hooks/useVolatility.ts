@@ -72,13 +72,17 @@ export function useVolatility(symbol: "EURUSD" | "XAUUSD", interval = "15min"): 
           throw new Error(json.error || `Market data provider returned HTTP ${res.status}`);
         }
 
-        const candles = (json.values || []).map((c: any) => ({
+        const candles: Candle[] = (json.values || []).map((c: any) => ({
           datetime: c.datetime,
           open: parseFloat(c.open),
           high: parseFloat(c.high),
           low: parseFloat(c.low),
           close: parseFloat(c.close),
-        }));
+        })).filter((c: Candle) =>
+          Number.isFinite(c.open) && Number.isFinite(c.high) &&
+          Number.isFinite(c.low) && Number.isFinite(c.close) &&
+          c.high >= c.low && c.close > 0
+        );
 
         // TwelveData returns newest first — reverse to oldest first for ATR calc
         const ordered = candles.slice().reverse();
