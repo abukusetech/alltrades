@@ -68,7 +68,7 @@ export function CashFlowByType({
       <CardBody className="space-y-3">
         <Row
           icon={<SafeIcon kind="maven" />}
-          label="Maven Prop Firm"
+          label="Prop Firm Accounts"
           income={buckets.MAVEN.income}
           expenses={buckets.MAVEN.expenses}
           count={buckets.MAVEN.count}
@@ -83,7 +83,7 @@ export function CashFlowByType({
         {buckets.UNATTRIBUTED.count > 0 && (
           <Row
             icon={<span className="h-3.5 w-3.5" />}
-            label="General Business (Cash & Funding)"
+            label="Unassigned / Business Operations"
             income={buckets.UNATTRIBUTED.income}
             expenses={buckets.UNATTRIBUTED.expenses}
             count={buckets.UNATTRIBUTED.count}
