@@ -29,7 +29,7 @@ export function WithdrawalHistory({
 
   const total = withdrawals.reduce((s, w) => s + (Number(w.amount) || 0), 0);
   const received = withdrawals.filter((w) => w.status === "Paid").reduce((s, w) => s + (Number(w.amount) || 0), 0);
-  const awaitingPayment = withdrawals.filter((w) => w.status === "Pending" || w.status === "Approved").reduce((s, w) => s + (Number(w.amount) || 0), 0);
+  const awaitingPayment = withdrawals.filter((w) => w.status === "Recorded" || w.status === "Pending" || w.status === "Approved").reduce((s, w) => s + (Number(w.amount) || 0), 0);
 
   async function confirm() {
     if (!pending) return;
