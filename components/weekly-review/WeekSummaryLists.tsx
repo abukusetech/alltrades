@@ -14,20 +14,20 @@ export function WeekSummaryLists({ week }: WeekSummaryListsProps) {
   const bestInstrument = byInstrument.length > 0 ? byInstrument[0] : null;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid gap-4 xl:grid-cols-2">
       {/* Instrument Performance */}
       <Card>
         <CardHeader>
           <CardTitle>Instrument Performance</CardTitle>
           <Badge tone="neutral">{byInstrument.length}</Badge>
         </CardHeader>
-        <CardBody>
+        <CardBody className="min-h-[112px]">
           {byInstrument.length === 0 ? (
             <Empty text="No instruments traded this week." />
           ) : (
             <ul className="space-y-3">
               {byInstrument.map((inst) => (
-                <li key={inst.instrument} className="flex items-center justify-between border-b border-border pb-2 last:border-0 last:pb-0">
+                <li key={inst.instrument} className="flex items-center justify-between rounded-md border border-border/70 bg-surface-soft/60 px-3 py-2.5 transition-colors hover:bg-surface-soft">
                   <div>
                     <div className="text-xs font-medium text-ink-900">{inst.instrument}</div>
                     <div className="text-3xs text-ink-500">{inst.trades} trades · {inst.winRate?.toFixed(0)}% win rate</div>
@@ -54,7 +54,7 @@ export function WeekSummaryLists({ week }: WeekSummaryListsProps) {
               {week.strategiesUsed.map((s) => (
                 <li
                   key={s}
-                  className="rounded border border-border bg-surface-soft px-2 py-1 text-2xs text-ink-700"
+                  className="rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-2xs font-medium text-brand-800"
                 >
                   {s}
                 </li>
@@ -103,7 +103,7 @@ export function WeekSummaryLists({ week }: WeekSummaryListsProps) {
                 <li
                   key={i}
                   className={cn(
-                    "rounded border border-warn-border bg-warn-bg px-3 py-2 text-2xs text-warn-text"
+                    "rounded-md border border-warn-border/70 bg-warn-bg/70 px-3 py-2.5 text-2xs leading-relaxed text-warn-text"
                   )}
                 >
                   {m}
