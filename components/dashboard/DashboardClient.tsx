@@ -195,7 +195,7 @@ export function DashboardClient() {
               <span className="text-[10px] text-ink-400">Quick access</span>
             </div>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              {workspaceLinks.map((item, index) => (
+              {workspaceLinks.map((item) => (
                 <Link key={item.href} href={item.href} className="group flex min-w-0 items-center justify-between gap-3 rounded-lg border border-border bg-surface-soft/70 px-3 py-3 transition hover:border-brand-300 hover:bg-brand-50/60">
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-ink-800 group-hover:text-brand-800">{item.label}</p>
