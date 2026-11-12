@@ -42,14 +42,6 @@ const SessionsPanel = dynamic(
   () => import("@/components/dashboard/SessionsPanel").then((m) => m.SessionsPanel),
   { ssr: false }
 );
-const VolatilityCard = dynamic(
-  () => import("@/components/market-intelligence/VolatilityCard").then((m) => m.VolatilityCard),
-  { ssr: false }
-);
-const SentimentSection = dynamic(
-  () => import("@/components/market-intelligence/SentimentSection").then((m) => m.SentimentSection),
-  { ssr: false }
-);
 
 const workspaceLinks = [
   { href: "/daily-analysis", label: "Daily Analysis", detail: "Build the trading thesis" },
@@ -258,46 +250,14 @@ export function DashboardClient() {
           )}
 
           <section className="space-y-4">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <SectionHeading
-                eyebrow="04 · Market intelligence"
-                title="Market overview"
-                detail="Context for EURUSD and XAUUSD. Market indicators are informational and are not trade signals."
-              />
-              <Link href="/market-intelligence" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-900">
-                Full market desk <ArrowUpRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-            <div className="rounded-xl border border-border bg-white p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <Activity className="h-4 w-4 text-brand-600" />
-                <p className="text-xs font-semibold text-ink-900">Volatility methodology</p>
-                <span className="rounded-full border border-border bg-surface-soft px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink-500">Reference</span>
+            <div className="flex items-center gap-2">
+              <Clock3 className="h-4 w-4 text-brand-600" />
+              <div>
+                <h2 className="text-base font-semibold tracking-tight text-ink-950">Live sessions & ICT kill zones</h2>
+                <p className="mt-1 text-xs text-ink-500">Session status in East Africa Time, with ICT kill-zone timing referenced to New York.</p>
               </div>
-              <p className="text-[11px] leading-5 text-ink-600">
-                Volatility uses ATR (14-period) compared with the average of the previous 20 ATR readings for the same instrument and timeframe. NORMAL means volatility is within its typical range; it does not mean the market is safe. Trade Check and your weekly loss limit remain the authoritative execution controls.
-              </p>
             </div>
-            <div className="grid gap-3 xl:grid-cols-2">
-              <VolatilityCard symbol="EURUSD" />
-              <VolatilityCard symbol="XAUUSD" />
-            </div>
-            <div className="rounded-xl border border-border bg-white p-4">
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <Activity className="h-4 w-4 text-brand-600" />
-                <h3 className="text-sm font-semibold text-ink-900">Market sentiment</h3>
-                <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-800">Reference only · Not for execution</span>
-              </div>
-              <SentimentSection />
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Clock3 className="h-4 w-4 text-brand-600" />
-                <h3 className="text-sm font-semibold text-ink-900">Live sessions & ICT kill zones</h3>
-                <span className="text-[10px] text-ink-400">EAT / New York reference</span>
-              </div>
-              <SessionsPanel />
-            </div>
+            <SessionsPanel />
           </section>
 
           <section className="space-y-3">
