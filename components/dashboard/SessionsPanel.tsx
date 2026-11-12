@@ -4,7 +4,7 @@ import * as React from "react";
 import { Clock, Zap, Globe, ShieldAlert } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { SESSIONS, KILL_ZONES, getGlobalMarketStatus, getSessionStatus, getKillZoneStatus, formatEat, formatEatFull } from "@/lib/market-engine";
+import { SESSIONS, KILL_ZONES, getGlobalMarketStatus, getSessionStatus, getKillZoneStatus, getSessionWindow, formatEat, formatEatFull } from "@/lib/market-engine";
 import { cn } from "@/lib/utils";
 
 function formatCountdown(totalSecs: number) {
@@ -84,9 +84,7 @@ export function SessionsPanel() {
               // If global market is closed, sessions are forced closed
               const status = market.isOpen ? getSessionStatus(s, now) : { status: "CLOSED", elapsedSecs: 0, remainingSecs: 0 };
               
-              // To display the times in EAT, we calculate the session's open/close times today
-              const localOpen = new Date(now);
-              localOpen.setHours(s.openHour, 0, 0, 0); // This is a rough approximation, but good enough for display
+              const window = getSessionWindow(s, now);
               
               return (
                 <div key={s.key} className="rounded-lg border border-border bg-surface-soft p-4">
@@ -100,7 +98,7 @@ export function SessionsPanel() {
                   <div className="mt-3 space-y-1 text-3xs text-ink-500">
                     <div className="flex justify-between">
                       <span>Time:</span>
-                      <span className="tabular text-ink-700">{s.openHour}:00 - {s.closeHour}:00</span>
+                      <span className="tabular text-ink-700">{formatEat(window.openAt)} - {formatEat(window.closeAt)}</span>
                     </div>
                   </div>
                   
@@ -113,7 +111,7 @@ export function SessionsPanel() {
                     <div className="mt-3 rounded bg-surface-muted px-2 py-2 text-center">
                       <div className="text-3xs font-medium text-ink-500 uppercase tracking-wide">Status</div>
                       <div className="mt-0.5 text-xs font-bold text-ink-700">
-                        {market.isOpen ? "Closed" : "Market Closed"}
+                        {market.isOpen ? "Closed" : "Forex market closed"}
                       </div>
                     </div>
                   )}
@@ -136,22 +134,23 @@ export function SessionsPanel() {
         <CardBody>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {KILL_ZONES.map((kz) => {
-              const status = market.isOpen ? getKillZoneStatus(kz, now) : { status: "CLOSED", remainingSecs: 0 };
+              const status = market.isOpen ? getKillZoneStatus(kz, now) : { status: "CLOSED", remainingSecs: 0, untilOpenSecs: 0 };
+              const nextWeek = market.isOpen && status.status !== "ACTIVE" && status.untilOpenSecs >= marketSecondsRemaining;
               return (
                 <div key={kz.key} className="rounded-lg border border-border bg-surface-soft p-3">
                   <div className="flex items-center justify-between">
                     <span className="text-2xs font-semibold text-ink-900">{kz.name}</span>
                     <Badge tone={status.status === "ACTIVE" ? "warn" : "neutral"}>
-                      {status.status === "ACTIVE" ? "ACTIVE" : "CLOSED"}
+                      {status.status === "ACTIVE" ? "ACTIVE" : nextWeek ? "NEXT WEEK" : market.isOpen ? "UPCOMING" : "CLOSED"}
                     </Badge>
                   </div>
                   <div className="mt-2 text-3xs text-ink-500">
-                    {kz.open}:00 - {kz.close}:00 NY
+                    {formatKillZoneTime(kz.open)} - {formatKillZoneTime(kz.close)} NY
                   </div>
                   <div className="mt-1 tabular text-xs font-semibold text-ink-700">
                     {market.isOpen && status.status === "ACTIVE"
                       ? `Ends in ${formatCountdown(status.remainingSecs)}`
-                      : "Market Closed"}
+                      : nextWeek ? "After weekly market reopen" : market.isOpen ? `Starts in ${formatCountdown(status.untilOpenSecs)}` : "Forex market closed"}
                   </div>
                 </div>
               );
@@ -161,4 +160,11 @@ export function SessionsPanel() {
       </Card>
     </div>
   );
+}
+
+
+function formatKillZoneTime(hour: number) {
+  const h = Math.floor(hour);
+  const m = Math.round((hour - h) * 60);
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ClipboardCheck, CheckCircle2, XCircle, AlertTriangle, Circle } from "lucide-react";
 import { useCurrentAccount } from "@/components/layout/AppShell";
 import { useTrades, useWithdrawals } from "@/lib/data/hooks";
@@ -17,6 +18,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { cn, formatCurrency, toDateKey } from "@/lib/utils";
+import { Select } from "@/components/ui/Select";
 
 const STATUS_LABEL: Record<GateStatus, string> = {
   ANALYSIS_INCOMPLETE: "ANALYSIS INCOMPLETE",
@@ -40,10 +42,12 @@ const STATUS_TONE: Record<GateStatus, "profit" | "loss" | "warn" | "neutral" | "
 
 export function TradeCheckClient() {
   const { currentAccount, currentAccountId } = useCurrentAccount();
+  const searchParams = useSearchParams();
+  const [instrument, setInstrument] = React.useState<"EURUSD" | "XAUUSD">(() => searchParams.get("instrument") === "XAUUSD" ? "XAUUSD" : "EURUSD");
   const { data: trades = [] } = useTrades(currentAccountId);
   const { data: withdrawals = [] } = useWithdrawals(currentAccountId);
   const today = toDateKey(new Date());
-  const { data: analysis, isLoading } = useDailyAnalysis(currentAccountId, today);
+  const { data: analysis, isLoading } = useDailyAnalysis(currentAccountId, today, instrument);
 
   const metrics = React.useMemo(
     () => computeAccountMetrics(currentAccount, trades, withdrawals),
@@ -63,7 +67,7 @@ export function TradeCheckClient() {
       stopLoss: analysis.planned_stop_loss,
       takeProfit: analysis.planned_take_profit,
       riskPercent: analysis.planned_risk_percent ?? 0,
-      balance: metrics.currentCapital,
+      balance: metrics.currentCapital > 0 ? metrics.currentCapital : Number(currentAccount?.starting_capital ?? 0),
       account: currentAccount,
     });
   }, [analysis, metrics.currentCapital, currentAccount]);
@@ -89,11 +93,23 @@ export function TradeCheckClient() {
       <PageHeader
         title="Trade Check"
         subtitle="Strict execution gate. READY only when every condition is verified."
-        actions={<Badge tone={STATUS_TONE[gate.status]}>{STATUS_LABEL[gate.status]}</Badge>}
+        actions={<div className="flex items-center gap-2"><Select value={instrument} onChange={(e) => setInstrument(e.target.value as "EURUSD" | "XAUUSD")} options={["EURUSD", "XAUUSD"]} /><Badge tone={STATUS_TONE[gate.status]}>{STATUS_LABEL[gate.status]}</Badge></div>}
       />
 
       <AccountHeader account={currentAccount} currentCapital={metrics.currentCapital} />
       <WeeklyLockBanner />
+
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface-soft/70 p-3">
+        <Link href={`/daily-analysis?instrument=${instrument}`}>
+          <Button variant="outline" size="sm">Review Daily Analysis</Button>
+        </Link>
+        <Link href="/journal">
+          <Button variant="outline" size="sm">Open Journal</Button>
+        </Link>
+        <Link href={`/position-calculator?instrument=${instrument}`}>
+          <Button variant="outline" size="sm">Position Calculator</Button>
+        </Link>
+      </div>
 
       {isLoading ? (
         <div className="py-12 text-center text-2xs text-ink-500">Loading today's analysis…</div>
@@ -103,7 +119,7 @@ export function TradeCheckClient() {
           title="No analysis saved for today"
           description="Complete the Daily Analysis before running the gate."
           action={
-            <Link href="/daily-analysis">
+            <Link href={`/daily-analysis?instrument=${instrument}`}>
               <Button>Open Daily Analysis</Button>
             </Link>
           }
@@ -158,7 +174,9 @@ export function TradeCheckClient() {
               >
                 {gate.ready
                   ? "All mandatory conditions passed. Proceed to the Journal to record the trade."
-                  : `Blocked — ${gate.blockers.length} reason${gate.blockers.length === 1 ? "" : "s"} listed above.`}
+                  : gate.status === "TRADE_TAKEN"
+                    ? "A trade is already recorded for today. The daily execution gate is now locked."
+                    : `Blocked — ${gate.blockers.length} reason${gate.blockers.length === 1 ? "" : "s"} listed above.`}
               </div>
               {gate.ready && (
                 <Link href={`/journal?analysis=${analysis.id}`}>

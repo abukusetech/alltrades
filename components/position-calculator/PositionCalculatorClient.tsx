@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import { Calculator, AlertTriangle, CheckCircle2, Link2 } from "lucide-react";
 import { useCurrentAccount } from "@/components/layout/AppShell";
 import { useTrades, useWithdrawals } from "@/lib/data/hooks";
@@ -19,6 +20,9 @@ import { cn, formatCurrency, parseNumberOrNull, toDateKey } from "@/lib/utils";
 
 export function PositionCalculatorClient() {
   const { currentAccount, currentAccountId } = useCurrentAccount();
+  const searchParams = useSearchParams();
+  const [overrideInstrument, setOverrideInstrument] =
+    React.useState<"EURUSD" | "XAUUSD" | null>(() => searchParams.get("instrument") === "XAUUSD" ? "XAUUSD" : null);
   const { data: trades = [] } = useTrades(currentAccountId);
   const { data: withdrawals = [] } = useWithdrawals(currentAccountId);
 
@@ -28,10 +32,9 @@ export function PositionCalculatorClient() {
   );
 
   const today = toDateKey(new Date());
-  const { data: analysis } = useDailyAnalysis(currentAccountId, today);
+  const analysisInstrument = overrideInstrument ?? "EURUSD";
+  const { data: analysis } = useDailyAnalysis(currentAccountId, today, analysisInstrument);
 
-  const [overrideInstrument, setOverrideInstrument] =
-    React.useState<"EURUSD" | "XAUUSD" | null>(null);
   const [overrideDirection, setOverrideDirection] =
     React.useState<"BUY" | "SELL" | null>(null);
   const [overrideEntry, setOverrideEntry] = React.useState<string>("");
@@ -66,7 +69,7 @@ export function PositionCalculatorClient() {
   const riskPct =
     overrideRisk !== ""
       ? parseNumberOrNull(overrideRisk) ?? 0
-      : analysis?.planned_risk_percent ?? 0.5;
+      : analysis?.planned_risk_percent ?? currentAccount?.personal_risk_percent ?? currentAccount?.maven_rules?.max_risk_per_trade_percent ?? 0.25;
 
   const balance =
     metrics.currentCapital > 0
@@ -274,6 +277,7 @@ export function PositionCalculatorClient() {
                 R:R below 1:2 — Trade Check will fail.
               </div>
             )}
+            <p className="text-3xs leading-relaxed text-ink-400">Estimated loss uses the configured contract specifications and rounded-down lot size. Commission, spread, swap and slippage may increase the actual loss.</p>
             {result.complete && (
               <div className="flex items-center gap-2 rounded border border-profit-border bg-profit-bg px-3 py-2 text-2xs text-profit-text">
                 <CheckCircle2 className="h-4 w-4" />

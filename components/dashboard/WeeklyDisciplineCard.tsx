@@ -68,7 +68,7 @@ export function WeeklyDisciplineCard({
             return (
               <li
                 key={i}
-                className="flex items-center justify-between rounded border border-border bg-surface-soft px-3 py-1.5 text-2xs"
+                className="flex items-center justify-between rounded-md border border-border/80 bg-surface-soft/70 px-3 py-2.5 text-2xs transition-colors hover:bg-surface-soft"
               >
                 <span className="flex items-center gap-2 text-ink-700">
                   {completed ? (

@@ -15,7 +15,7 @@ export function AnalyticsStatsCards({ metrics }: AnalyticsStatsCardsProps) {
         : "text-ink-900";
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <Stat
         label="Total Trades"
         value={String(metrics.totalTrades)}
@@ -43,13 +43,11 @@ export function AnalyticsStatsCards({ metrics }: AnalyticsStatsCardsProps) {
         hint={`${metrics.losingTrades} losing trades`}
       />
       {/* Hidden but visually balanced row */}
-      <div className="hidden sm:block lg:hidden" />
-      <div className="hidden lg:block" />
-      <div className="hidden lg:block" />
-      <div className="hidden lg:block" />
-      <div className="sm:col-span-2 lg:col-span-4">
+      
+      
+      <div className="sm:col-span-2 xl:col-span-4">
         <Card>
-          <CardBody className="grid grid-cols-2 gap-4 py-4 sm:grid-cols-4">
+          <CardBody className="grid grid-cols-2 gap-4 rounded-lg bg-surface-soft/60 p-4 sm:grid-cols-4">
             <Small
               label="Net P/L"
               value={formatCurrency(metrics.totalPnL, { showSign: true })}
@@ -104,11 +102,11 @@ function Stat({
 }) {
   return (
     <Card>
-      <CardBody className="p-4">
+      <CardBody className="relative overflow-hidden p-4 before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-brand-500">
         <div className="eyebrow">{label}</div>
         <div
           className={cn(
-            "tabular mt-1 text-lg font-semibold text-ink-900",
+            "tabular mt-2 text-xl font-semibold tracking-tight text-ink-950",
             valueClass
           )}
         >

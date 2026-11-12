@@ -83,6 +83,12 @@ export function LoginForm() {
           </div>
         )}
 
+        <div className="text-right">
+          <Link href="/forgot-password" className="text-2xs font-medium text-brand-700 hover:text-brand-800">
+            Forgot password?
+          </Link>
+        </div>
+
         <Button
           type="submit"
           loading={loading}
@@ -94,6 +100,7 @@ export function LoginForm() {
       </div>
 
       <div className="mt-5 border-t border-border pt-4 text-center text-2xs text-ink-500">
+
         Don&apos;t have an account?{" "}
         <Link
           href="/signup"

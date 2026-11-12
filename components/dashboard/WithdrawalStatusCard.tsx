@@ -45,8 +45,8 @@ export function WithdrawalStatusCard({ metrics }: WithdrawalStatusCardProps) {
       </CardHeader>
 
       <CardBody className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <Row label="4% Target" value={formatCurrency(withdrawalTarget)} />
+        <div className="grid grid-cols-2 gap-3 rounded-lg bg-surface-soft/60 p-3">
+          <Row label="Configured target" value={formatCurrency(withdrawalTarget)} />
           <Row
             label="Profit Toward Target"
             value={formatCurrency(profitTowardTarget)}
@@ -61,7 +61,7 @@ export function WithdrawalStatusCard({ metrics }: WithdrawalStatusCardProps) {
         </div>
 
         <div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-ink-100">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-ink-100">
             <div
               className={
                 targetReached

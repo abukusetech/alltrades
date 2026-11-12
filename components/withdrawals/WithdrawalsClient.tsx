@@ -35,6 +35,8 @@ export function WithdrawalsClient() {
     else if (currentAccount?.account_type === "MAVEN") setTab("maven");
   }, [currentAccount?.account_type]);
 
+  const providerLabel = currentAccount?.broker || currentAccount?.maven_rules?.program_label || currentAccount?.maven_rules?.program || "Funded account";
+
   const metrics = React.useMemo(
     () => computeAccountMetrics(currentAccount, trades, withdrawals),
     [currentAccount, trades, withdrawals]
@@ -61,7 +63,7 @@ export function WithdrawalsClient() {
       <div className="space-y-6">
         <PageHeader
           title="Withdrawals"
-          subtitle="Maven payouts and personal cash withdrawals."
+          subtitle="Track funded-account payouts and personal trading withdrawals."
         />
         <EmptyState
           title="No account selected"
@@ -76,15 +78,12 @@ export function WithdrawalsClient() {
       <div className="space-y-6">
         <PageHeader
           title="Withdrawals"
-          subtitle="Maven payouts and personal cash withdrawals."
+          subtitle="Track funded-account payouts and personal trading withdrawals."
         />
         <BlockLoader label="Loading withdrawals" />
       </div>
     );
   }
-
-  const visibleWithdrawals =
-    tab === "maven" ? mavenWithdrawals : personalWithdrawals;
 
   return (
     <div className="space-y-6">
@@ -92,13 +91,13 @@ export function WithdrawalsClient() {
         title="Withdrawals"
         subtitle={
           tab === "maven"
-            ? "Maven payouts requested and received."
+            ? `${providerLabel} payouts requested and received.`
             : "Cash withdrawn from your personal broker account."
         }
         actions={
           <Badge tone={tab === "maven" ? "brand" : "profit"}>
             {tab === "maven"
-              ? `${mavenCount} Maven account${mavenCount === 1 ? "" : "s"}`
+              ? `${mavenCount} funded account${mavenCount === 1 ? "" : "s"}`
               : `${personalCount} personal account${personalCount === 1 ? "" : "s"}`}
           </Badge>
         }
@@ -115,7 +114,7 @@ export function WithdrawalsClient() {
             active={tab === "maven"}
             onClick={() => setTab("maven")}
             icon={<Building2 className="h-3.5 w-3.5" />}
-            label="Maven Payouts"
+            label="Funded Payouts"
             count={mavenWithdrawals.length}
           />
           <TabBtn

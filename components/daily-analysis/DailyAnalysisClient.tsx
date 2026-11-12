@@ -29,7 +29,6 @@ import {
   DEFAULT_LIQUIDITY,
   DEFAULT_END_OF_DAY,
   DEFAULT_TF,
-  computeConfirmationScore,
   computeRR,
   computeRiskAmount,
   computeExpectedProfit,
@@ -134,12 +133,13 @@ export function DailyAnalysisClient() {
 
   const searchParams = useSearchParams();
   const initialDate = searchParams.get("date");
+  const initialInstrument = searchParams.get("instrument");
   const [date, setDate] = React.useState(() => initialDate ?? toDateKey(new Date()));
 
   // Instrument — separate analyses per instrument
-  const [activeInstrument, setActiveInstrument] = React.useState<string>("EURUSD");
+  const [activeInstrument, setActiveInstrument] = React.useState<string>(() => initialInstrument === "XAUUSD" ? "XAUUSD" : "EURUSD");
   // Tabs
-  const [activeTab, setActiveTab] = React.useState<AnalysisTabKey>("htf");
+  const [activeTab, setActiveTab] = React.useState<AnalysisTabKey>("context");
 
   const { data: existing, isLoading, mutate } = useDailyAnalysis(
     currentAccountId,
@@ -479,10 +479,10 @@ export function DailyAnalysisClient() {
   const riskAmount = React.useMemo(() => {
     if (!analysis) return 0;
     return computeRiskAmount(
-      Number(currentAccount?.starting_capital ?? 0),
+      metrics.currentCapital > 0 ? metrics.currentCapital : Number(currentAccount?.starting_capital ?? 0),
       analysis.planned_risk_percent ?? 0
     );
-  }, [analysis, currentAccount]);
+  }, [analysis, currentAccount, metrics.currentCapital]);
 
   const expectedProfit = React.useMemo(
     () => computeExpectedProfit(riskAmount, rr),
@@ -513,8 +513,6 @@ export function DailyAnalysisClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slPips, rr, expectedProfit, riskAmount, analysis?.id]);
 
-  const checklist = analysis?.confirmation_checklist ?? DEFAULT_CHECKLIST;
-  const confirmScore = React.useMemo(() => computeConfirmationScore(checklist), [checklist]);
   const derivedStatus = analysis ? deriveStatus(analysis) : "ANALYSIS_CREATED";
 
   // ────────────────────────────────────────────────────────────
@@ -665,7 +663,7 @@ export function DailyAnalysisClient() {
             <Button variant="outline" size="sm" onClick={goToday}>
               Today
             </Button>
-            <Link href={`/trade-check?analysis=${analysis.id}`}>
+            <Link href={`/trade-check?analysis=${analysis.id}&instrument=${activeInstrument}`}>
               <Button variant="outline" size="sm">Open Trade Check</Button>
             </Link>
             <Link href="/journal">
@@ -717,220 +715,116 @@ export function DailyAnalysisClient() {
         }}
       />
 
-      {/* HTF section (new tab) */}
+      {/* WORKSPACE CONTENT — one home for each part of the trading process */}
+      {activeTab === "context" && (
+        <div className="space-y-4">
+          <SectionIntro eyebrow="01 / MARKET CONTEXT" title="Build the directional picture" description="Set the broad bias, structure and session context before looking for an entry." />
+          <Card>
+            <CardHeader><CardTitle>Market Bias</CardTitle></CardHeader>
+            <CardBody className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Field label="Higher Timeframe Bias" htmlFor="htf_bias">
+                  <Select id="htf_bias" value={analysis.higher_timeframe_bias ?? ""} onChange={(e) => update({ higher_timeframe_bias: (e.target.value || null) as DailyAnalysis["higher_timeframe_bias"] })} options={["Bullish", "Bearish", "Neutral"]} placeholder="Select" />
+                </Field>
+                <Field label="Market Structure" htmlFor="market_structure">
+                  <Select id="market_structure" value={analysis.market_structure ?? ""} onChange={(e) => update({ market_structure: (e.target.value || null) as DailyAnalysis["market_structure"] })} options={["Bullish", "Bearish", "Ranging", "Unclear"]} placeholder="Select" />
+                </Field>
+                <Field label="Primary Direction" htmlFor="primary_direction">
+                  <Select id="primary_direction" value={analysis.primary_direction ?? ""} onChange={(e) => update({ primary_direction: (e.target.value || null) as DirectionOption | null })} options={["BUY", "SELL", "WAIT"]} placeholder="Select" />
+                </Field>
+                <Field label="Confidence" htmlFor="confidence">
+                  <Select id="confidence" value={analysis.confidence ?? ""} onChange={(e) => update({ confidence: (e.target.value || null) as DailyAnalysis["confidence"] })} options={["High", "Medium", "Low"]} placeholder="Select" />
+                </Field>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <TagPicker label="Bias tags" options={BIAS_TAGS} value={analysis.bias_tags ?? []} onChange={(v) => update({ bias_tags: v })} />
+                <TagPicker label="Structure tags" options={STRUCTURE_TAGS} value={analysis.structure_tags ?? []} onChange={(v) => update({ structure_tags: v })} />
+                <TagPicker label="Session tags" options={SESSION_TAGS} value={analysis.session_tags ?? []} onChange={(v) => update({ session_tags: v })} />
+                <TagPicker label="News tags" options={NEWS_TAGS} value={analysis.news_tags ?? []} onChange={(v) => update({ news_tags: v })} />
+              </div>
+              <Field label="Analysis notes" htmlFor="analysis_notes">
+                <Textarea id="analysis_notes" rows={4} value={analysis.analysis_notes ?? ""} onChange={(e) => update({ analysis_notes: e.target.value })} placeholder="What is the market telling you today?" />
+              </Field>
+            </CardBody>
+          </Card>
+          <ScoringSection analysis={analysis} onUpdate={update} />
+        </div>
+      )}
+
       {activeTab === "htf" && (
         <div className="space-y-4">
-          <div className="border-b border-border pb-2">
-            <h2 className="text-sm font-semibold text-ink-900 dark:text-white">Higher-Timeframe Analysis</h2>
-            <p className="mt-0.5 text-3xs text-ink-500">
-              D1 for overall environment, H4 for bias, H1 for intraday narrative.
-            </p>
-          </div>
+          <SectionIntro eyebrow="02 / TOP-DOWN ANALYSIS" title="Higher timeframes" description="Start with the daily environment, refine the bias on H4, then map the active H1 narrative." />
           <HigherTimeframeSection analysis={analysis} onUpdate={update} />
           <DealingRangeSection analysis={analysis} onUpdate={update} />
         </div>
       )}
 
-      {/* Liquidity & Zones tab */}
       {activeTab === "liquidity" && (
         <div className="space-y-4">
-          <div className="border-b border-border pb-2">
-            <h2 className="text-sm font-semibold text-ink-900 dark:text-white">Liquidity & Key Zones</h2>
-            <p className="mt-0.5 text-3xs text-ink-500">
-              Describe the narrative and mark the key levels, order blocks, and liquidity pools you are tracking.
-            </p>
-          </div>
+          <SectionIntro eyebrow="03 / PRICE DELIVERY" title="Liquidity & key zones" description="Record the liquidity draw, important institutional zones and the levels price may react to." />
           <LiquidityZonesSection analysis={analysis} onUpdate={update} />
+          <KeyLevelsCard levels={analysis.key_levels ?? DEFAULT_KEY_LEVELS} onChange={(levels) => update({ key_levels: levels })} />
+          <LiquidityCard value={analysis.liquidity ?? DEFAULT_LIQUIDITY} onChange={(v) => update({ liquidity: v })} />
         </div>
       )}
 
-      {/* Lower Timeframe tab */}
       {activeTab === "ltf" && (
         <div className="space-y-4">
-          <div className="border-b border-border pb-2">
-            <h2 className="text-sm font-semibold text-ink-900 dark:text-white">Lower-Timeframe Analysis</h2>
-            <p className="mt-0.5 text-3xs text-ink-500">
-              M30 to refine the trading area, M15/M5 to identify setup and confirmation, M1 for execution.
-            </p>
-          </div>
+          <SectionIntro eyebrow="04 / EXECUTION AREA" title="Lower-timeframe analysis" description="Refine the point of interest and wait for a clear trigger. Avoid forcing an entry before the lower timeframe agrees." />
           <LowerTimeframeSection analysis={analysis} onUpdate={update} />
         </div>
       )}
 
-      {/* Trade Setup tab */}
       {activeTab === "setup" && (
         <div className="space-y-4">
-          <div className="border-b border-border pb-2">
-            <h2 className="text-sm font-semibold text-ink-900 dark:text-white">Trade Setup</h2>
-            <p className="mt-0.5 text-3xs text-ink-500">
-              Direction, entry, stop loss, targets, risk, and reward.
-            </p>
-          </div>
-          <TradeSetupSection analysis={analysis} onUpdate={update} accountCapital={Number(currentAccount?.starting_capital ?? 0)} />
+          <SectionIntro eyebrow="05 / TRADE PLAN" title="Define the trade before execution" description="Set direction, entry, invalidation and target. Review the calculated risk and reward before proceeding." />
+          <TradeSetupSection analysis={analysis} onUpdate={update} accountCapital={metrics.currentCapital > 0 ? metrics.currentCapital : Number(currentAccount?.starting_capital ?? 0)} />
+          <NewsCard analysis={analysis} onUpdate={update} />
         </div>
       )}
 
-      {/* Confirmation tab */}
       {activeTab === "confirmation" && (
         <div className="space-y-4">
-          <div className="border-b border-border pb-2">
-            <h2 className="text-sm font-semibold text-ink-900 dark:text-white">Confirmation Checklist</h2>
-            <p className="mt-0.5 text-3xs text-ink-500">
-              Every condition must be Yes or N/A before Trade Check considers the trade ready.
-            </p>
-          </div>
+          <SectionIntro eyebrow="06 / VALIDATION" title="Wait for confirmation" description="Mark each condition honestly. A completed checklist does not override the account's independent risk rules." />
           <ConfirmationSection analysis={analysis} onUpdate={update} />
         </div>
       )}
 
-      {/* Scoring tab */}
-      {activeTab === "context" && (
+      {activeTab === "scenarios" && (
         <div className="space-y-4">
-          <div className="border-b border-border pb-2">
-            <h2 className="text-sm font-semibold text-ink-900 dark:text-white">Analysis Scoring</h2>
-            <p className="mt-0.5 text-3xs text-ink-500">
-              Completion, setup quality, confirmation, and final decision.
-            </p>
-          </div>
-          <ScoringSection analysis={analysis} onUpdate={update} />
+          <SectionIntro eyebrow="07 / CONTINGENCY PLAN" title="Plan both sides of the market" description="Write the conditions that would activate each scenario, and define when standing aside is the correct decision." />
+          <ScenariosCard scenarios={analysis.scenarios ?? DEFAULT_SCENARIOS} onChange={(s) => update({ scenarios: s })} />
         </div>
       )}
 
+      {activeTab === "review" && (
+        <div className="space-y-4">
+          <SectionIntro eyebrow="08 / POST-MARKET" title="Review what actually happened" description="Compare the market's actual delivery with your preparation. Record execution quality, mistakes and the lesson to carry forward." />
+          <OutcomeCard analysis={analysis} onUpdate={update} onRecompute={(mc) => computeAnalysisAccuracy(analysis, mc)} />
+          <EndOfDayCard value={analysis.end_of_day_review ?? DEFAULT_END_OF_DAY} onChange={(v) => update({ end_of_day_review: v })} lesson={analysis.lesson ?? ""} onLessonChange={(v) => update({ lesson: v })} />
+        </div>
+      )}
 
       {/* LINKED TRADE */}
-      <LinkedTradeBanner
-        accountId={currentAccountId}
-        dailyAnalysisId={analysis.id}
-        tradePlanId={analysis.active_plan_id ?? null}
-      />
+      <LinkedTradeBanner accountId={currentAccountId} dailyAnalysisId={analysis.id} tradePlanId={analysis.active_plan_id ?? null} />
 
-      {/* PIPELINE */}
-      <Card>
-        <CardBody className="py-3">
-          <div className="flex flex-wrap items-center gap-2 text-3xs">
-            {(["ANALYSIS", "CONFIRMATION", "TRADE_CHECK", "READY", "TRADE_TAKEN"] as const).map((step, i) => {
-              const stages = ["ANALYSIS", "CONFIRMATION", "TRADE_CHECK", "READY", "TRADE_TAKEN"];
-              const current = computePipelineStage(analysis, false);
-              const currentIdx = stages.indexOf(current);
-              const active = i <= currentIdx;
-              return (
-                <span key={step} className="flex items-center gap-2">
-                  <span className={cn(
-                    "rounded border px-2 py-0.5",
-                    active ? "border-brand-600 bg-brand-50 font-medium text-brand-700" : "border-border text-ink-500"
-                  )}>
-                    {step.replace(/_/g, " ")}
-                  </span>
-                  {i < stages.length - 1 && <span className="text-ink-300">→</span>}
-                </span>
-              );
-            })}
-          </div>
-        </CardBody>
-      </Card>
-
-      {/* HEADER SUMMARY */}
-      <Card>
-        <CardBody className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <HeaderStat label="Analysis date" value={formatDateLong(new Date(date + "T00:00:00"))} />
-          <HeaderStat label="Status" value={STATUS_LABEL[derivedStatus] ?? derivedStatus} tone={STATUS_TONE[derivedStatus]} />
-          <HeaderStat
-            label="Today's risk"
-            value={`${analysis.planned_risk_percent?.toFixed(2) ?? "—"}% / ${formatCurrency(
-              computeRiskAmount(Number(currentAccount.starting_capital), analysis.planned_risk_percent ?? 0)
-            )}`}
-          />
-          <HeaderStat label="Max trades today" value="1" />
-        </CardBody>
-      </Card>
-
-      <ReadinessPanel analysis={analysis} />
-
-      {/* Existing sections — always visible to preserve working functionality */}
-      <Card>
-        <CardHeader><CardTitle>Market Bias</CardTitle></CardHeader>
-        <CardBody className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Field label="Higher Timeframe Bias" htmlFor="htf_bias">
-              <Select
-                id="htf_bias"
-                value={analysis.higher_timeframe_bias ?? ""}
-                onChange={(e) => update({ higher_timeframe_bias: (e.target.value || null) as DailyAnalysis["higher_timeframe_bias"] })}
-                options={["Bullish", "Bearish", "Neutral"]}
-                placeholder="Select"
-              />
-            </Field>
-            <Field label="Market Structure" htmlFor="market_structure">
-              <Select
-                id="market_structure"
-                value={analysis.market_structure ?? ""}
-                onChange={(e) => update({ market_structure: (e.target.value || null) as DailyAnalysis["market_structure"] })}
-                options={["Bullish", "Bearish", "Ranging", "Unclear"]}
-                placeholder="Select"
-              />
-            </Field>
-            <Field label="Primary Direction" htmlFor="primary_direction">
-              <Select
-                id="primary_direction"
-                value={analysis.primary_direction ?? ""}
-                onChange={(e) => update({ primary_direction: (e.target.value || null) as DirectionOption | null })}
-                options={["BUY", "SELL", "WAIT"]}
-                placeholder="Select"
-              />
-            </Field>
-            <Field label="Confidence" htmlFor="confidence">
-              <Select
-                id="confidence"
-                value={analysis.confidence ?? ""}
-                onChange={(e) => update({ confidence: (e.target.value || null) as DailyAnalysis["confidence"] })}
-                options={["High", "Medium", "Low"]}
-                placeholder="Select"
-              />
-            </Field>
-          </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <TagPicker label="Bias tags" options={BIAS_TAGS} value={analysis.bias_tags ?? []} onChange={(v) => update({ bias_tags: v })} />
-            <TagPicker label="Structure tags" options={STRUCTURE_TAGS} value={analysis.structure_tags ?? []} onChange={(v) => update({ structure_tags: v })} />
-            <TagPicker label="Liquidity tags" options={LIQUIDITY_TAGS} value={analysis.liquidity_tags ?? []} onChange={(v) => update({ liquidity_tags: v })} />
-            <TagPicker label="Setup tags" options={SETUP_TAGS} value={analysis.setup_tags ?? []} onChange={(v) => update({ setup_tags: v })} allowCustom />
-            <TagPicker label="Session tags" options={SESSION_TAGS} value={analysis.session_tags ?? []} onChange={(v) => update({ session_tags: v })} />
-            <TagPicker label="News tags" options={NEWS_TAGS} value={analysis.news_tags ?? []} onChange={(v) => update({ news_tags: v })} />
-          </div>
-          <Field label="Analysis Notes" htmlFor="analysis_notes">
-            <Textarea
-              id="analysis_notes"
-              rows={3}
-              value={analysis.analysis_notes ?? ""}
-              onChange={(e) => update({ analysis_notes: e.target.value })}
-              placeholder="Notes..."
-            />
-          </Field>
-        </CardBody>
-      </Card>
-
-      {/* MULTI TIMEFRAME (legacy — kept for compatibility) */}
-      <div className="space-y-4">
-        <TimeframeCard tf="4H" label="4-Hour" value={analysis.tf_4h ?? DEFAULT_TF} onChange={(v) => update({ tf_4h: v })} fields={["trend", "structure", "keyLevels", "liquidity", "zone", "notes"]} />
-        <TimeframeCard tf="1H" label="1-Hour" value={analysis.tf_1h ?? DEFAULT_TF} onChange={(v) => update({ tf_1h: v })} fields={["trend", "structure", "keyLevels", "liquidity", "notes"]} />
-        <TimeframeCard tf="15M" label="15-Minute" value={analysis.tf_15m ?? DEFAULT_TF} onChange={(v) => update({ tf_15m: v })} fields={["structure", "entryArea", "confirmation", "notes"]} />
-        <TimeframeCard tf="5M" label="5-Minute" value={analysis.tf_5m ?? DEFAULT_TF} onChange={(v) => update({ tf_5m: v })} fields={["trigger", "slArea", "tpArea", "notes"]} />
-      </div>
-
-      <KeyLevelsCard levels={analysis.key_levels ?? DEFAULT_KEY_LEVELS} onChange={(levels) => update({ key_levels: levels })} />
-      <LiquidityCard value={analysis.liquidity ?? DEFAULT_LIQUIDITY} onChange={(v) => update({ liquidity: v })} />
-      <TradePlanCard analysis={analysis} onUpdate={update} slPips={slPips} rr={rr} riskAmount={riskAmount} expectedProfit={expectedProfit} />
-      <ChecklistCard checklist={checklist} onChange={(c) => update({ confirmation_checklist: c })} score={confirmScore} status={derivedStatus} onSetStatus={(s) => update({ status: s })} />
-      <ScenariosCard scenarios={analysis.scenarios ?? DEFAULT_SCENARIOS} onChange={(s) => update({ scenarios: s })} />
-      <NewsCard analysis={analysis} onUpdate={update} />
-      <OutcomeCard analysis={analysis} onUpdate={update} onRecompute={(mc) => computeAnalysisAccuracy(analysis, mc)} />
-      <EndOfDayCard value={analysis.end_of_day_review ?? DEFAULT_END_OF_DAY} onChange={(v) => update({ end_of_day_review: v })} lesson={analysis.lesson ?? ""} onLessonChange={(v) => update({ lesson: v })} />
-
-      {history.length > 0 && <HistoryCard history={history} onPick={(d, inst) => { setDate(d); setActiveInstrument(inst); }} />}
+      {/* RECENT ANALYSES */}
+      {activeTab === "review" && history.length > 0 && <HistoryCard history={history} onPick={(d, inst) => { setDate(d); setActiveInstrument(inst); }} />}
     </div>
   );
 }
 
 // ---------- Subcomponents ----------
+
+function SectionIntro({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-gradient-to-r from-brand-50/80 via-white to-white px-4 py-4 dark:from-brand-950/30 dark:via-ink-900 dark:to-ink-900">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-700 dark:text-brand-300">{eyebrow}</div>
+      <h2 className="mt-1 text-base font-semibold tracking-tight text-ink-950 dark:text-white">{title}</h2>
+      <p className="mt-1 max-w-3xl text-xs leading-5 text-ink-600 dark:text-ink-300">{description}</p>
+    </div>
+  );
+}
 
 function SaveIndicator({ state }: { state: "idle" | "saving" | "saved" | "error" }) {
   if (state === "saving") return <span className="inline-flex items-center gap-1 rounded border border-border bg-surface-soft px-2 py-1 text-3xs text-ink-600"><Clock className="h-3 w-3 animate-pulse" /> Saving…</span>;
@@ -1285,7 +1179,7 @@ function HistoryCard({ history, onPick }: { history: DailyAnalysis[]; onPick: (d
       <CardBody className="p-0">
         <div className="divide-y divide-border">
           {history.slice(0, 30).map((a) => (
-            <button key={a.id} type="button" onClick={() => onPick(a.analysis_date, a.instrument)} className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-soft">
+            <button key={a.id} type="button" onClick={() => onPick(a.analysis_date, a.instrument)} className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors hover:bg-brand-50/40">
               <div className="min-w-0">
                 <div className="text-xs font-medium text-ink-900">{formatDateLong(new Date(a.analysis_date + "T00:00:00"))}</div>
                 <div className="mt-0.5 text-3xs text-ink-500 flex items-center gap-1">

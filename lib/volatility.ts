@@ -54,27 +54,39 @@ export function classifyVolatility(
   candles: Candle[],
   instrument: string
 ): VolatilityResult {
-  if (candles.length < 30) {
+  if (candles.length < 48) {
     return {
       atr: null,
       atrPercent: null,
       relativeToAverage: null,
       classification: "UNAVAILABLE",
-      reason: "Insufficient candle data (need at least 30 candles)",
+      reason: "Insufficient candle data (need at least 48 candles for ATR and 20 historical readings)",
     };
   }
 
-  const currentATR = calculateATR(candles, 14);
-  const historicalATR = calculateATR(candles.slice(0, -14), 14);
+  const period = 14;
+  const currentATR = calculateATR(candles, period);
+  const historicalSamples: number[] = [];
+  for (let end = candles.length - period - 1; end >= period && historicalSamples.length < 20; end--) {
+    const sample = calculateATR(candles.slice(0, end + 1), period);
+    if (sample !== null && Number.isFinite(sample)) historicalSamples.push(sample);
+  }
+  const historicalATR = historicalSamples.length === 20
+    ? historicalSamples.reduce((sum, value) => sum + value, 0) / historicalSamples.length
+    : null;
   const currentPrice = candles[candles.length - 1].close;
 
-  if (currentATR === null || historicalATR === null || currentPrice <= 0) {
+  if (
+    currentATR === null || historicalATR === null ||
+    !Number.isFinite(currentATR) || !Number.isFinite(historicalATR) || historicalATR <= 0 ||
+    !Number.isFinite(currentPrice) || currentPrice <= 0
+  ) {
     return {
       atr: null,
       atrPercent: null,
       relativeToAverage: null,
       classification: "UNAVAILABLE",
-      reason: "Could not calculate ATR (insufficient data or invalid prices)",
+      reason: "Could not calculate ATR or its 20-sample historical average (invalid or insufficient prices)",
     };
   }
 

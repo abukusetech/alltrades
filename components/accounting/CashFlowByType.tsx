@@ -29,7 +29,7 @@ export function CashFlowByType({
     for (const t of transactions) {
       if (t.reversed_by) continue;
       
-      const accId = (t as unknown as { account_id?: string | null }).account_id;
+      const accId = t.account_id ?? null;
       const type = accId ? accountTypeById.get(accId) ?? "UNATTRIBUTED" : "UNATTRIBUTED";
       
       const bucket =
@@ -51,7 +51,7 @@ export function CashFlowByType({
         bucket.expenses += amount;
       }
       
-      // Include allocation in the count so Maven shows transactions
+      // Exclude internal transfers and allocations from external activity counts
       if (t.kind !== "allocation" && t.kind !== "transfer" && t.kind !== "owner_contribution") {
         bucket.count += 1;
       }
@@ -68,7 +68,7 @@ export function CashFlowByType({
       <CardBody className="space-y-3">
         <Row
           icon={<SafeIcon kind="maven" />}
-          label="Maven Prop Firm"
+          label="Prop Firm Accounts"
           income={buckets.MAVEN.income}
           expenses={buckets.MAVEN.expenses}
           count={buckets.MAVEN.count}
@@ -83,7 +83,7 @@ export function CashFlowByType({
         {buckets.UNATTRIBUTED.count > 0 && (
           <Row
             icon={<span className="h-3.5 w-3.5" />}
-            label="General Business (Cash & Funding)"
+            label="Unassigned / Business Operations"
             income={buckets.UNATTRIBUTED.income}
             expenses={buckets.UNATTRIBUTED.expenses}
             count={buckets.UNATTRIBUTED.count}

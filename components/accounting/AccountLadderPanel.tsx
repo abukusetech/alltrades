@@ -16,8 +16,6 @@ import { computeAccountMetrics } from "@/lib/calc";
 import { useCurrentAccount } from "@/components/layout/AppShell";
 import { AccountLadderStageCard, type PurchaseStatus } from "./AccountLadderStageCard";
 
-const DEFAULT_LADDER = [2000, 5000, 10000, 20000, 50000];
-
 export function AccountLadderPanel({
   accountFundBalance,
   settings,
@@ -45,23 +43,32 @@ export function AccountLadderPanel({
     try {
       let rows = await listPurchases(supabase, user.id);
 
-      // Seed initial ladder ONLY if the user has zero rows
-      if (rows.length === 0) {
-        const prices = settings?.account_prices ?? {
-          "2000": 15,
-          "5000": 19,
-          "10000": 37,
-          "20000": 68,
-          "50000": 170,
-        };
-        const seedData = DEFAULT_LADDER.map((size) => ({
-          user_id: user.id,
-          size,
-          price: prices[String(size)] ?? 0,
-          status: "planned",
-        }));
-        await supabase.from("accounting_account_purchases").insert(seedData);
-        rows = await listPurchases(supabase, user.id);
+      // Only initialise stages from prices the user explicitly configured.
+      // Never create sample account sizes or provider prices automatically.
+      if (rows.length === 0 && settings?.account_prices) {
+        const configuredStages = Object.entries(settings.account_prices)
+          .map(([size, price]) => ({ size: Number(size), price: Number(price) }))
+          .filter((stage) =>
+            Number.isFinite(stage.size) &&
+            stage.size > 0 &&
+            Number.isFinite(stage.price) &&
+            stage.price >= 0
+          )
+          .sort((a, b) => a.size - b.size);
+
+        if (configuredStages.length > 0) {
+          const seedData = configuredStages.map((stage) => ({
+            user_id: user.id,
+            size: stage.size,
+            price: stage.price,
+            status: "planned",
+          }));
+          const { error } = await supabase
+            .from("accounting_account_purchases")
+            .insert(seedData);
+          if (error) throw error;
+          rows = await listPurchases(supabase, user.id);
+        }
       }
 
       setPurchases(rows);
@@ -154,7 +161,7 @@ export function AccountLadderPanel({
             <TrendingUp className="h-4 w-4 text-brand-600" />
             <CardTitle>Account Ladder Progress</CardTitle>
           </div>
-          <Badge tone="brand">{formatPercent(ladderPercent, 0)} complete</Badge>
+          <Badge tone={sorted.length > 0 ? "brand" : "neutral"}>{sorted.length > 0 ? `${formatPercent(ladderPercent, 0)} complete` : "Not configured"}</Badge>
         </CardHeader>
         <CardBody className="space-y-4">
           <div className="h-2 w-full overflow-hidden rounded-full bg-ink-100">
@@ -180,14 +187,27 @@ export function AccountLadderPanel({
 
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <div className="text-2xs font-medium uppercase tracking-wide text-ink-500">
-            Progression: $2K → $50K
+          <div>
+            <div className="text-2xs font-medium uppercase tracking-wide text-ink-700">
+              Your account progression
+            </div>
+            <p className="mt-0.5 text-3xs text-ink-500">
+              Stages and prices come from your configured account plan.
+            </p>
           </div>
           <Button variant="outline" size="sm" onClick={() => void load()} leftIcon={<RefreshCw className="h-3.5 w-3.5" />}>
             Refresh
           </Button>
         </div>
 
+        {sorted.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border-strong bg-surface-soft px-5 py-8 text-center">
+            <p className="text-sm font-semibold text-ink-900">No account stages configured</p>
+            <p className="mx-auto mt-1 max-w-lg text-xs leading-relaxed text-ink-600">
+              Add your account sizes and purchase prices in Accounting Settings. Your ladder will be created from those values; no provider-specific prices are assumed.
+            </p>
+          </div>
+        ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {sorted.map((p) => {
             const isNext = nextStage?.id === p.id;
@@ -216,6 +236,7 @@ export function AccountLadderPanel({
             );
           })}
         </div>
+        )}
       </div>
 
       {editing && (

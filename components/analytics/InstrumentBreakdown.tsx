@@ -23,7 +23,7 @@ export function InstrumentBreakdown({ stats }: { stats: InstrumentStats[] }) {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm">
-              <thead className="bg-surface-muted text-3xs uppercase tracking-wide text-ink-500">
+              <thead className="bg-surface-muted text-[10px] uppercase tracking-[0.1em] text-ink-500">
                 <tr>
                   <th className="px-4 py-2 text-left font-medium">Instrument</th>
                   <th className="px-4 py-2 text-right font-medium">Trades</th>
@@ -33,8 +33,8 @@ export function InstrumentBreakdown({ stats }: { stats: InstrumentStats[] }) {
               </thead>
               <tbody className="divide-y divide-border">
                 {stats.map((s) => (
-                  <tr key={s.instrument} className="hover:bg-surface-soft">
-                    <td className="px-4 py-2.5 text-xs font-medium text-ink-900">{s.instrument}</td>
+                  <tr key={s.instrument} className="transition-colors hover:bg-brand-50/40">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-ink-900">{s.instrument}</td>
                     <td className="tabular px-4 py-2.5 text-right text-xs text-ink-700">
                       {s.trades}
                       <span className="ml-1 text-3xs text-ink-400">({s.wins}W · {s.losses}L)</span>

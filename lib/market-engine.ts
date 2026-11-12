@@ -12,7 +12,7 @@ export interface MarketStatus {
 export function getTzParts(date: Date, timeZone: string) {
   const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone,
-    hour12: false,
+    hourCycle: "h23",
     weekday: "short",
     year: "numeric",
     month: "2-digit",
@@ -173,6 +173,15 @@ export const SESSIONS: SessionDef[] = [
   { key: "newyork", name: "New York", timezone: "America/New_York", openHour: 8, closeHour: 17 },
 ];
 
+/** Exact session boundaries for the current local session date, converted to UTC. */
+export function getSessionWindow(session: SessionDef, now: Date) {
+  const local = getTzParts(now, session.timezone);
+  return {
+    openAt: zonedTimeToUtc(local.year, local.month, local.day, session.openHour, 0, session.timezone),
+    closeAt: zonedTimeToUtc(local.year, local.month, local.day, session.closeHour, 0, session.timezone),
+  };
+}
+
 export function getSessionStatus(session: SessionDef, now: Date) {
   const local = getTzParts(now, session.timezone);
   const nowSecs = local.hour * 3600 + local.minute * 60 + local.second;
@@ -206,15 +215,23 @@ export const KILL_ZONES = [
   { key: "nypm", name: "NY PM Kill Zone", open: 13.5, close: 16 },
 ];
 
-export function getKillZoneStatus(kz: typeof KILL_ZONES[0], now: Date) {
+export function getKillZoneStatus(kz: typeof KILL_ZONES[number], now: Date) {
   const ny = getTzParts(now, "America/New_York");
   const nowSecs = ny.hour * 3600 + ny.minute * 60 + ny.second;
+  const openHour = Math.floor(kz.open);
+  const openMinute = Math.round((kz.open - openHour) * 60);
+  const closeHour = Math.floor(kz.close);
+  const closeMinute = Math.round((kz.close - closeHour) * 60);
   const openSecs = kz.open * 3600;
   const closeSecs = kz.close * 3600;
-
-  const isOpen = nowSecs >= openSecs && nowSecs < closeSecs;
+  const active = nowSecs >= openSecs && nowSecs < closeSecs;
+  const nextDate = new Date(Date.UTC(ny.year, ny.month - 1, ny.day));
+  if (!active && nowSecs >= closeSecs) nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+  const nextOpenAt = zonedTimeToUtc(nextDate.getUTCFullYear(), nextDate.getUTCMonth() + 1, nextDate.getUTCDate(), openHour, openMinute, "America/New_York");
+  const closeAt = zonedTimeToUtc(ny.year, ny.month, ny.day, closeHour, closeMinute, "America/New_York");
   return {
-    status: isOpen ? "ACTIVE" : "CLOSED",
-    remainingSecs: isOpen ? closeSecs - nowSecs : 0,
+    status: active ? "ACTIVE" : "UPCOMING",
+    remainingSecs: active ? Math.max(0, Math.floor((closeAt.getTime() - now.getTime()) / 1000)) : 0,
+    untilOpenSecs: active ? 0 : Math.max(0, Math.floor((nextOpenAt.getTime() - now.getTime()) / 1000)),
   };
 }

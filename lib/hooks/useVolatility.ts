@@ -11,6 +11,7 @@ export interface VolatilityData {
   lastUpdated: string | null;
   providerStatus: "loading" | "ready" | "error" | "closed";
   errorMessage: string | null;
+  warning: string | null;
 }
 
 export function useVolatility(symbol: "EURUSD" | "XAUUSD", interval = "15min"): VolatilityData {
@@ -27,6 +28,7 @@ export function useVolatility(symbol: "EURUSD" | "XAUUSD", interval = "15min"): 
     lastUpdated: null,
     providerStatus: "loading",
     errorMessage: null,
+    warning: null,
   });
 
   React.useEffect(() => {
@@ -53,6 +55,7 @@ export function useVolatility(symbol: "EURUSD" | "XAUUSD", interval = "15min"): 
               lastUpdated: null,
               providerStatus: "closed",
               errorMessage: null,
+              warning: null,
             });
           }
           return;
@@ -64,18 +67,22 @@ export function useVolatility(symbol: "EURUSD" | "XAUUSD", interval = "15min"): 
           `/api/market/candles?symbol=${encodeURIComponent(apiSymbol)}&interval=${interval}&outputsize=100`
         );
 
-        if (!res.ok) throw new Error("Market data unavailable");
         const json = await res.json();
+        if (!res.ok || json.error) {
+          throw new Error(json.error || `Market data provider returned HTTP ${res.status}`);
+        }
 
-        if (json.error) throw new Error(json.error);
-
-        const candles = (json.values || []).map((c: any) => ({
+        const candles: Candle[] = (json.values || []).map((c: any) => ({
           datetime: c.datetime,
           open: parseFloat(c.open),
           high: parseFloat(c.high),
           low: parseFloat(c.low),
           close: parseFloat(c.close),
-        }));
+        })).filter((c: Candle) =>
+          Number.isFinite(c.open) && Number.isFinite(c.high) &&
+          Number.isFinite(c.low) && Number.isFinite(c.close) &&
+          c.high >= c.low && c.close > 0
+        );
 
         // TwelveData returns newest first — reverse to oldest first for ATR calc
         const ordered = candles.slice().reverse();
@@ -88,9 +95,10 @@ export function useVolatility(symbol: "EURUSD" | "XAUUSD", interval = "15min"): 
           symbol,
           interval,
           result,
-          lastUpdated: new Date().toISOString(),
+          lastUpdated: json.cachedAt ?? new Date().toISOString(),
           providerStatus: "ready",
           errorMessage: null,
+          warning: typeof json.warning === "string" ? json.warning : null,
         });
       } catch (err) {
         if (!mounted) return;

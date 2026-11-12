@@ -69,7 +69,7 @@ export function AnalysisClient() {
           <AccountHeader account={currentAccount} currentCapital={metrics.currentCapital} />
           <AnalysisStatsCards stats={stats} />
 
-          <div className="flex flex-col gap-3 rounded-lg border border-border bg-white p-4 shadow-card sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-3 rounded-xl border border-border bg-gradient-to-r from-white to-surface-soft/70 p-4 shadow-card sm:flex-row sm:items-center">
             <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
               <Select value={instrument} onChange={(e) => setInstrument(e.target.value)} options={["All instruments", ...INSTRUMENTS] as unknown as string[]} />
               <Select value={timeframe} onChange={(e) => setTimeframe(e.target.value)} options={["All timeframes", ...TIMEFRAMES] as unknown as string[]} />
@@ -103,7 +103,7 @@ export function AnalysisClient() {
                 </THead>
                 <TBody>
                   {filtered.map((a) => (
-                    <TR key={a.id} className="cursor-pointer" onClick={() => setDetail(a)}>
+                    <TR key={a.id} className="cursor-pointer transition-colors hover:bg-brand-50/40" onClick={() => setDetail(a)}>
                       <TD>{a.analysis_date}</TD>
                       <TD>{a.analysis_time ? a.analysis_time.slice(0, 5) : "—"}</TD>
                       <TD className="font-medium text-ink-900">{a.instrument}</TD>

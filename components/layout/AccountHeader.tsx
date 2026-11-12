@@ -20,15 +20,15 @@ export function AccountHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-4 rounded-lg border border-border bg-surface-soft px-5 py-4 sm:flex-row sm:items-center sm:justify-between",
+        "flex flex-col gap-4 rounded-xl border border-border bg-gradient-to-r from-white via-white to-brand-50/70 px-5 py-4 shadow-card sm:flex-row sm:items-center sm:justify-between",
         className
       )}
     >
       <div className="min-w-0">
-        <div className="text-3xs font-medium uppercase tracking-wider text-ink-500">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500">
           Account
         </div>
-        <div className="mt-0.5 truncate text-sm font-semibold text-ink-900">
+        <div className="mt-1 truncate text-base font-semibold tracking-tight text-ink-950">
           {account ? account.name : "No account selected"}
         </div>
         {account && (
@@ -41,11 +41,11 @@ export function AccountHeader({
         )}
       </div>
 
-      <div className="sm:text-right">
+      <div className="rounded-lg border border-brand-100 bg-white/80 px-4 py-2.5 sm:min-w-[190px] sm:text-right">
         <div className="text-3xs font-medium uppercase tracking-wider text-ink-500">
           Current Capital
         </div>
-        <div className="tabular mt-0.5 text-lg font-semibold tracking-tight text-ink-900">
+        <div className="tabular mt-1 text-2xl font-bold tracking-tight text-ink-950">
           {account ? formatCurrency(currentCapital) : "—"}
         </div>
       </div>

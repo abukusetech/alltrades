@@ -65,23 +65,25 @@ function readXauusdSpecs(account: Account | null): XauusdSpecs | null {
   if (!Number.isFinite(cs) || cs <= 0) return null;
   if (!Number.isFinite(ts) || ts <= 0) return null;
   if (!Number.isFinite(tv) || tv <= 0) return null;
+  if (!Number.isFinite(ml) || ml <= 0) return null;
+  if (!Number.isFinite(ls) || ls <= 0) return null;
   return {
     contract_size: cs,
     tick_size: ts,
     tick_value_usd: tv,
     digits: Number.isFinite(dg) && dg > 0 ? dg : 2,
-    min_lot: Number.isFinite(ml) && ml > 0 ? ml : 0.01,
-    lot_step: Number.isFinite(ls) && ls > 0 ? ls : 0.01,
+    min_lot: ml,
+    lot_step: ls,
   };
 }
 
-function floorToStep(value: number, step: number, min: number): number {
-  if (step <= 0) return Math.max(min, value);
+function floorToStep(value: number, step: number): number {
+  if (step <= 0) return Math.max(0, value);
   const steps = Math.floor(value / step);
   const rounded = steps * step;
   // avoid floating point drift: re-round to 8 decimal places
   const clean = Math.round(rounded * 1e8) / 1e8;
-  return Math.max(min, clean);
+  return Math.max(0, clean);
 }
 
 const EMPTY: Omit<PositionResult, "instrument"> = {
@@ -121,6 +123,8 @@ export function computePosition(input: PositionInput): PositionResult {
     return { ...EMPTY, instrument: sym, reason: "Enter a risk percentage" };
   if (balance <= 0)
     return { ...EMPTY, instrument: sym, reason: "Account balance is zero" };
+  if (account?.account_currency && account.account_currency.toUpperCase() !== "USD")
+    return { ...EMPTY, instrument: sym, reason: `Exact ${account.account_currency.toUpperCase()} conversion is not configured. Use a USD-denominated account or configure verified conversion support before sizing.` };
 
   if (direction === "BUY") {
     if (stopLoss >= entry)
@@ -134,7 +138,9 @@ export function computePosition(input: PositionInput): PositionResult {
       return { ...EMPTY, instrument: sym, reason: "SELL: take profit must be below entry" };
   }
 
-  const riskAmount = round((balance * riskPercent) / 100, 2);
+  const targetRiskAmount = round((balance * riskPercent) / 100, 2);
+  if (!Number.isFinite(targetRiskAmount) || targetRiskAmount <= 0)
+    return { ...EMPTY, instrument: sym, reason: "Risk amount must be greater than zero" };
   const slDistanceRaw = Math.abs(entry - stopLoss);
   const tpDistanceRaw = Math.abs(takeProfit - entry);
   const slDistance = round(slDistanceRaw, 5);
@@ -150,8 +156,12 @@ export function computePosition(input: PositionInput): PositionResult {
     const lossPerLot = slPips * pipValuePerLot;
     if (lossPerLot <= 0)
       return { ...EMPTY, instrument: sym, reason: "Cannot compute lot size (SL too small)" };
-    const rawLot = riskAmount / lossPerLot;
-    const lotSize = floorToStep(rawLot, 0.01, 0.01);
+    const rawLot = targetRiskAmount / lossPerLot;
+    const lotSize = floorToStep(rawLot, 0.01);
+    if (lotSize < 0.01) {
+      return { ...EMPTY, instrument: sym, reason: `Risk is below the minimum 0.01 lot at this stop distance — calculated size is ${rawLot.toFixed(4)} lots` };
+    }
+    const riskAmount = round(lotSize * lossPerLot, 2);
     const potentialProfit = round(lotSize * tpPips * pipValuePerLot, 2);
     return {
       complete: true,
@@ -185,8 +195,8 @@ export function computePosition(input: PositionInput): PositionResult {
   if (lossPerLot <= 0)
     return { ...EMPTY, instrument: sym, reason: "Cannot compute lot size (SL too small)" };
 
-  const rawLot = riskAmount / lossPerLot;
-  const lotSize = floorToStep(rawLot, specs.lot_step, specs.min_lot);
+  const rawLot = targetRiskAmount / lossPerLot;
+  const lotSize = floorToStep(rawLot, specs.lot_step);
   if (lotSize < specs.min_lot) {
     return {
       ...EMPTY,
@@ -195,6 +205,7 @@ export function computePosition(input: PositionInput): PositionResult {
     };
   }
 
+  const riskAmount = round(lotSize * lossPerLot, 2);
   const potentialProfit = round(lotSize * profitPerLot, 2);
   return {
     complete: true,

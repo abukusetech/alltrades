@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 const CLASS_TONE = {
   LOW: "neutral" as const,
-  NORMAL: "profit" as const,
+  NORMAL: "neutral" as const,
   HIGH: "warn" as const,
   EXTREME: "loss" as const,
   UNAVAILABLE: "neutral" as const,
@@ -81,6 +81,11 @@ export function VolatilityCard({ symbol }: { symbol: "EURUSD" | "XAUUSD" }) {
 
         {data.providerStatus === "ready" && (
           <>
+            {data.warning && (
+              <div className="rounded border border-warn-border bg-warn-bg px-3 py-2 text-3xs text-warn-text">
+                {data.warning}
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-3">
               <Stat
                 label="ATR (14)"
@@ -108,11 +113,11 @@ export function VolatilityCard({ symbol }: { symbol: "EURUSD" | "XAUUSD" }) {
                 tone={
                   data.result.relativeToAverage === null
                     ? undefined
-                    : data.result.relativeToAverage > 1.5
+                    : data.result.relativeToAverage > 2
                       ? "loss"
-                      : data.result.relativeToAverage > 1.2
+                      : data.result.relativeToAverage > 1.3
                         ? "warn"
-                        : "profit"
+                        : undefined
                 }
               />
             </div>

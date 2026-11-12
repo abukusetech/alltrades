@@ -22,6 +22,8 @@ import { TradeDetailModal } from "./TradeDetailModal";
 import { INSTRUMENTS, RESULTS, STRATEGIES } from "@/lib/constants";
 import type { Trade, DailyAnalysis } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
+import { useDailyAnalysesHistory } from "@/lib/data/daily-analysis-hooks";
+import { computePosition } from "@/lib/position-math";
 
 type SortKey = "trade_date" | "profit_loss" | "instrument" | "result";
 
@@ -43,6 +45,38 @@ export function JournalClient() {
   const [detail, setDetail] = React.useState<Trade | null>(null);
   const [prefillAnalysis, setPrefillAnalysis] = React.useState<DailyAnalysis | null>(null);
   const searchParams = useSearchParams();
+  const analysisIdFromUrl = searchParams.get("analysis");
+  const { data: dailyAnalyses = [], isLoading: analysesLoading } = useDailyAnalysesHistory(currentAccountId, 60);
+  const openedAnalysisRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    if (!analysisIdFromUrl || !currentAccountId || !currentAccount || analysesLoading) return;
+    if (openedAnalysisRef.current === analysisIdFromUrl) return;
+    const linkedAnalysis = dailyAnalyses.find((item) => item.id === analysisIdFromUrl);
+    if (!linkedAnalysis) return;
+    openedAnalysisRef.current = analysisIdFromUrl;
+    setEditing(null);
+    setDetail(null);
+    const linkedMetrics = computeAccountMetrics(currentAccount, trades, withdrawals);
+    const sized = computePosition({
+      instrument: linkedAnalysis.instrument,
+      direction: linkedAnalysis.planned_direction === "BUY" || linkedAnalysis.planned_direction === "SELL" ? linkedAnalysis.planned_direction : null,
+      entry: linkedAnalysis.planned_entry,
+      stopLoss: linkedAnalysis.planned_stop_loss,
+      takeProfit: linkedAnalysis.planned_take_profit,
+      riskPercent: linkedAnalysis.planned_risk_percent ?? 0,
+      balance: linkedMetrics.currentCapital > 0 ? linkedMetrics.currentCapital : Number(currentAccount.starting_capital ?? 0),
+      account: currentAccount,
+    });
+    setPrefillAnalysis({
+      ...linkedAnalysis,
+      computed_lot_size: sized.lotSize,
+      computed_risk_amount: sized.riskAmount,
+      planned_risk_amount: sized.riskAmount ?? linkedAnalysis.planned_risk_amount,
+      planned_rr: sized.rr ?? linkedAnalysis.planned_rr,
+    });
+    setFormOpen(true);
+  }, [analysisIdFromUrl, currentAccountId, currentAccount, analysesLoading, dailyAnalyses, trades, withdrawals]);
 
   const metrics = React.useMemo(
     () => computeAccountMetrics(currentAccount, trades, withdrawals),
@@ -105,7 +139,7 @@ export function JournalClient() {
         <>
           <AccountHeader account={currentAccount} currentCapital={metrics.currentCapital} />
 
-          <div className="flex flex-col gap-3 rounded-lg border border-border bg-white p-4 shadow-card sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-3 rounded-xl border border-border bg-gradient-to-r from-white to-surface-soft/70 p-4 shadow-card sm:flex-row sm:items-center">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-400" />
               <Input value={search} onChange={(e) => setSearch(e.target.value)}
@@ -170,7 +204,7 @@ export function JournalClient() {
                     const plClass = pl > 0 ? "text-profit-text" : pl < 0 ? "text-loss-text" : "text-ink-700";
                     const tone = t.result === "Win" ? "profit" : t.result === "Loss" ? "loss" : "neutral";
                     return (
-                      <TR key={t.id} className="cursor-pointer" onClick={() => setDetail(t)}>
+                      <TR key={t.id} className="cursor-pointer transition-colors hover:bg-brand-50/40" onClick={() => setDetail(t)}>
                         <TD>{t.trade_date}</TD>
                         <TD>{t.trade_time ? t.trade_time.slice(0, 5) : "—"}</TD>
                         <TD className="font-medium text-ink-900">{t.instrument}</TD>

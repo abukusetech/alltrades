@@ -44,8 +44,8 @@ export function DayDetailPanel({
   const tone = pnl > 0 ? "profit" : pnl < 0 ? "loss" : "neutral";
 
   return (
-    <div className="rounded-lg border border-border bg-white shadow-card">
-      <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+    <div className="overflow-hidden rounded-xl border border-border bg-white shadow-card">
+      <div className="flex items-start justify-between gap-3 border-b border-border bg-gradient-to-r from-brand-50/70 to-white px-4 py-4">
         <div className="min-w-0">
           <div className="text-3xs uppercase tracking-wide text-ink-500">
             Day detail
@@ -70,7 +70,7 @@ export function DayDetailPanel({
             <div className="text-3xs uppercase tracking-wide text-ink-500">
               Realized P/L
             </div>
-            <div className={cn("tabular mt-0.5 text-lg font-semibold", pnlClass)}>
+            <div className={cn("tabular mt-1 text-2xl font-bold tracking-tight", pnlClass)}>
               {formatCurrency(pnl, { showSign: true })}
             </div>
           </div>

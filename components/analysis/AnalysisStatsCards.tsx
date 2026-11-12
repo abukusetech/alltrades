@@ -4,7 +4,7 @@ import { formatPercent } from "@/lib/utils";
 
 export function AnalysisStatsCards({ stats }: { stats: AnalysisStats }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
       <Stat
         label="Total Analyses"
         value={String(stats.total)}
@@ -49,9 +49,9 @@ function Stat({
 }) {
   return (
     <Card>
-      <CardBody className="p-4">
-        <div className="eyebrow">{label}</div>
-        <div className="tabular mt-1 text-lg font-semibold text-ink-900">
+      <CardBody className="relative overflow-hidden p-4 before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-brand-500">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">{label}</div>
+        <div className="tabular mt-2 text-xl font-semibold tracking-tight text-ink-950">
           {value}
         </div>
         <div className="mt-0.5 text-3xs text-ink-500">{hint}</div>

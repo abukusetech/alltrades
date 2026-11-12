@@ -116,7 +116,7 @@ export function pipsFromPrices(
   const pipSize =
     instrument === "USDJPY" || instrument === "GBPJPY"
       ? 0.01
-      : instrument === "XAUUSD / Gold"
+      : (instrument === "XAUUSD" || instrument === "XAUUSD / Gold")
         ? 0.1
         : instrument === "NAS100" || instrument === "US30" || instrument === "SPX500"
           ? 1
