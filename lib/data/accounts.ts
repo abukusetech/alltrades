@@ -1,5 +1,5 @@
 ﻿import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Account, Profile } from "@/lib/types";
+import type { Account, AccountType, Profile } from "@/lib/types";
 
 export async function getProfile(
   supabase: SupabaseClient,
@@ -44,6 +44,8 @@ export interface AccountInsert {
   name: string;
   starting_capital: number;
   notes?: string | null;
+  account_type?: AccountType;
+  provider?: string | null;
 }
 
 export async function createAccount(
@@ -58,6 +60,9 @@ export async function createAccount(
       name: values.name,
       starting_capital: values.starting_capital,
       notes: values.notes ?? null,
+      account_type: values.account_type ?? "UNCLASSIFIED",
+      broker: values.account_type === "PERSONAL" ? values.provider ?? null : null,
+      funding_source: values.account_type === "MAVEN" ? values.provider ?? null : null,
     })
     .select("*")
     .single();

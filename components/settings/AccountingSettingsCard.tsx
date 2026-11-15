@@ -28,7 +28,7 @@ export function AccountingSettingsCard() {
   const [saving, setSaving] = React.useState(false);
   const [settings, setSettings] = React.useState<AccountingSettings | null>(null);
 
-  const [propFirm, setPropFirm] = React.useState("Maven");
+  const [propFirm, setPropFirm] = React.useState("");
   const [traderShare, setTraderShare] = React.useState("80");
   const [accountPct, setAccountPct] = React.useState("50");
   const [savingsPct, setSavingsPct] = React.useState("30");
@@ -87,7 +87,7 @@ export function AccountingSettingsCard() {
       }
 
       await upsertSettings(supabase, user.id, {
-        default_prop_firm: propFirm.trim() || "Maven",
+        default_prop_firm: propFirm.trim(),
         default_trader_share_percent: Number(traderShare) || 80,
         account_fund_percent: Number(accountPct) || 50,
         savings_percent: Number(savingsPct) || 30,
@@ -125,8 +125,8 @@ export function AccountingSettingsCard() {
       </CardHeader>
       <CardBody className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Default prop firm" htmlFor="prop_firm">
-            <Input id="prop_firm" value={propFirm} onChange={(e) => setPropFirm(e.target.value)} />
+          <Field label="Default funding provider" htmlFor="prop_firm" hint="Optional default for new prop firm accounts.">
+            <Input id="prop_firm" value={propFirm} onChange={(e) => setPropFirm(e.target.value)} placeholder="e.g. FTMO, Maven, The5ers" />
           </Field>
           <Field label="Default trader share %" htmlFor="trader_share">
             <Input

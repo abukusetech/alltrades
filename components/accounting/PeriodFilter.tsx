@@ -12,7 +12,7 @@ export interface PeriodValue {
 }
 
 function iso(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export function computePeriod(kind: PeriodKind, custom?: { from: string; to: string }): PeriodValue {

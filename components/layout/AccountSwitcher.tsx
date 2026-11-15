@@ -59,12 +59,12 @@ export function AccountSwitcher({
     filterMode === "ALL"
       ? "All Accounts"
       : filterMode === "MAVEN"
-        ? "Maven Prop Firm"
+        ? "Prop Firm Accounts"
         : filterMode === "PERSONAL"
           ? "Personal Capital"
           : current?.name ?? "Select account";
 
-  const mavenCount = accounts.filter((a) => a.account_type === "MAVEN").length;
+  const propFirmCount = accounts.filter((a) => a.account_type === "MAVEN").length;
   const personalCount = accounts.filter((a) => a.account_type === "PERSONAL").length;
 
   if (accounts.length === 0) {
@@ -123,12 +123,12 @@ export function AccountSwitcher({
                 setOpen(false);
               }}
             />
-            {mavenCount > 0 && (
+            {propFirmCount > 0 && (
               <ModeItem
                 active={filterMode === "MAVEN"}
                 icon={<Building2 className="h-3.5 w-3.5 text-brand-600" />}
-                label="Maven Prop Firm"
-                hint={`${mavenCount} account${mavenCount === 1 ? "" : "s"}`}
+                label="Prop Firm Accounts"
+                hint={`${propFirmCount} account${propFirmCount === 1 ? "" : "s"}`}
                 onClick={() => {
                   onFilterModeChange("MAVEN");
                   setOpen(false);

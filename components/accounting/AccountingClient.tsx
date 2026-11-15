@@ -122,8 +122,8 @@ export function AccountingClient() {
 
       const [f, txs, ledgerRows, wds, ps, s] = await Promise.all([
         listFunds(supabase, user.id),
-        listTransactions(supabase, user.id, { from: period.from, to: period.to }),
-        listLedger(supabase, user.id, { from: period.from, to: period.to }),
+        listTransactions(supabase, user.id),
+        listLedger(supabase, user.id),
         listWithdrawals(supabase, user.id),
         listPurchases(supabase, user.id),
         getSettings(supabase, user.id),
@@ -151,8 +151,13 @@ export function AccountingClient() {
   );
 
   const funds = data?.funds ?? [];
-  const transactions = data?.transactions ?? [];
-  const ledger = data?.ledger ?? [];
+  const allTransactions = data?.transactions ?? [];
+  const allLedger = data?.ledger ?? [];
+  const transactions = allTransactions.filter((t) => t.occurred_on >= period.from && t.occurred_on <= period.to);
+  const ledger = allLedger.filter((entry) => {
+    const txn = allTransactions.find((t) => t.id === entry.transaction_id);
+    return !!txn && txn.occurred_on >= period.from && txn.occurred_on <= period.to;
+  });
   const balances = data?.balances ?? [];
   const withdrawals = data?.withdrawals ?? [];
   const purchases = data?.purchases ?? [];
@@ -213,8 +218,8 @@ export function AccountingClient() {
 
   const editPostings = React.useMemo(() => {
     if (!editTarget) return [];
-    return ledger.filter((l) => l.transaction_id === editTarget.id);
-  }, [editTarget, ledger]);
+    return allLedger.filter((l) => l.transaction_id === editTarget.id);
+  }, [editTarget, allLedger]);
 
   function openAllocationFor(w: AccountingWithdrawal) {
     setAllocTarget(w);
@@ -231,7 +236,7 @@ export function AccountingClient() {
     <div className="space-y-6">
       <PageHeader
         title="Accounting"
-        subtitle="Track your trading business finances — funds, withdrawals, expenses and upgrades."
+        subtitle="A clear financial record of trading income, operating costs, cash reserves and account investments."
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -350,20 +355,20 @@ export function AccountingClient() {
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <SummaryCard label="Withdrawals received" value={formatCurrency(totalWithdrawals)} hint={`${period.from} → ${period.to}`} tone={totalWithdrawals > 0 ? "profit" : "neutral"} />
-                <SummaryCard label="Business cash" value={formatCurrency(balance("business_cash"))} tone={balance("business_cash") < 0 ? "loss" : "neutral"} />
-                <SummaryCard label="Account fund" value={formatCurrency(balance("account_fund"))} hint="Reserved for future accounts" tone="brand" />
+                <SummaryCard label="Operating cash" value={formatCurrency(balance("business_cash"))} tone={balance("business_cash") < 0 ? "loss" : "neutral"} />
+                <SummaryCard label="Account growth reserve" value={formatCurrency(balance("account_fund"))} hint="Reserved for future accounts" tone="brand" />
                 <SummaryCard label="Personal savings" value={formatCurrency(balance("personal_savings"))} tone={balance("personal_savings") > 0 ? "profit" : "neutral"} />
                 <SummaryCard label="Emergency reserve" value={formatCurrency(balance("emergency_fund"))} />
-                <SummaryCard label="Account purchases" value={formatCurrency(totalAccountPurchaseCost)} tone="loss" />
-                <SummaryCard label="Expenses" value={formatCurrency(totalExpenses)} tone={totalExpenses > 0 ? "loss" : "neutral"} />
-                <SummaryCard label="Net cash flow" value={formatCurrency(netCashFlow, { showSign: true })} tone={netCashFlow >= 0 ? "profit" : "loss"} hint="Income minus expenses and savings transfers" />
+                <SummaryCard label="Account acquisition" value={formatCurrency(totalAccountPurchaseCost)} tone="loss" />
+                <SummaryCard label="Operating expenses" value={formatCurrency(totalExpenses)} tone={totalExpenses > 0 ? "loss" : "neutral"} />
+                <SummaryCard label="Net cash flow" value={formatCurrency(netCashFlow, { showSign: true })} tone={netCashFlow >= 0 ? "profit" : "loss"} hint="Income less expenses and reserve allocations" />
               </div>
 
               <div className="grid gap-6 lg:grid-cols-3">
                 <div className="lg:col-span-2">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Transaction Ledger</CardTitle>
+                      <CardTitle>Transaction Register</CardTitle>
                       <span className="text-2xs text-ink-500">{transactions.length} entries</span>
                     </CardHeader>
                     <CardBody>
@@ -430,8 +435,8 @@ export function AccountingClient() {
 
       {tab === "reports" && (
         <ReportsPanel
-          transactions={transactions}
-          ledger={ledger}
+          transactions={allTransactions}
+          ledger={allLedger}
           withdrawals={withdrawals}
           purchases={purchases}
           balances={balances}

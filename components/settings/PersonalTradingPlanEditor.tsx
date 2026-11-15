@@ -339,7 +339,7 @@ export function PersonalTradingPlanEditor({
 
         <CardBody className="space-y-5">
           <div className="rounded border border-profit-border bg-profit-bg px-3 py-2 text-2xs text-profit-text">
-            These settings are yours alone. Never overwritten by Maven rules.
+            These settings belong to this personal account and stay separate from every prop firm rule set.
             Version history is preserved every time you save.
           </div>
 

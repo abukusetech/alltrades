@@ -69,7 +69,7 @@ export function ReportsPanel({
 
   const withdrawalCsv = withdrawals.map((w) => ({
     request_date: w.request_date,
-    prop_firm: w.prop_firm,
+    provider: w.prop_firm,
     account_size: w.account_size ?? "",
     gross: w.gross_requested,
     trader_share_percent: w.trader_share_percent,
@@ -157,7 +157,7 @@ export function ReportsPanel({
       {/* Withdrawals by account size */}
       <Card>
         <CardHeader>
-          <CardTitle>Payouts by Account Size</CardTitle>
+          <CardTitle>Payouts by Trading Account Size</CardTitle>
           <Badge tone="neutral">{bySize.length} sizes</Badge>
         </CardHeader>
         <CardBody className="p-0">
